@@ -80,14 +80,22 @@ Here are the main features of this custom variant type:
 - 非常快的 JSON 序列化/反序列化，支持类似 MongoDB 的扩展语法；
 - Access to properties in code, via late-binding (including almost no speed penalty due to our VCL hack as [already detailed](https://blog.synopse.info/post/2011/07/01/Faster-variant-late-binding));
 - 通过后期绑定访问代码中的属性（如前所述，由于我们的 VCL 黑客攻击，几乎没有速度损失）；
-- Direct access to the internal variant *names* and *values* arrays from code, by trans-typing into a `TDocVariantData record`;通过转入 TDocVariantData 记录，从代码中直接访问内部变体名称和值数组；
-- Instance life-time is managed by the compiler (like any other `variant` type), without the need to use `interfaces` or explicit `try..finally` blocks;实例生命周期由编译器管理（与任何其他变体类型一样），无需使用接口或显式 try..finally 块；
-- Optimized to use as little memory and CPU resource as possible (in contrast to most other libraries, it does not allocate one `class` instance per node, but rely on pre-allocated arrays);优化为使用尽可能少的内存和 CPU 资源（与大多数其他库相比，它不会为每个节点分配一个类实例，而是依赖于预先分配的数组）；
-- Opened to extension of any content storage - for instance, it will perfectly integrate with BSON serialization and custom *MongoDB* types (*ObjectID, RegEx*...), to be used in conjunction with *MongoDB* servers;开放任何内容存储的扩展 - 例如，它将与 BSON 序列化和自定义 MongoDB 类型（ObjectID、RegEx...）完美集成，与 MongoDB 服务器结合使用；
-- Perfectly integrated with our [Dynamic array wrapper](https://blog.synopse.info/post/2011/03/12/TDynArray-and-Record-compare/load/save-using-fast-RTTI) and its JSON serialization as with the [`record` serialization](https://blog.synopse.info/post/2013/12/10/JSON-record-serialization);与我们的动态数组包装器及其 JSON 序列化（如记录序列化）完美集成；
-- Designed to work with our *mORMot* ORM: any `TSQLRecord` instance containing such `variant` custom types as published properties will be recognized by the ORM core, and work as expected with any database back-end (storing the content as JSON in a TEXT column);设计用于与我们的 mORMot ORM 配合使用：任何包含此类变体自定义类型作为已发布属性的 TSQLRecord 实例都将被 ORM 核心识别，并按预期与任何数据库后端配合使用（将内容作为 JSON 存储在 TEXT 列中）；
-- Designed to work with our *mORMot* SOA: any [`interface`-based service](https://blog.synopse.info/post/2012/03/07/Interface-based-services) is able to consume or publish such kind of content, as `variant` kind of parameters;设计用于与我们的 mORMot SOA 配合使用：任何基于接口的服务都能够使用或发布此类内容，作为参数的变体；
-- Fully integrated with the Delphi IDE: any `variant` instance will be displayed as JSON in the IDE debugger, making it very convenient to work with.与 Delphi IDE 完全集成：任何变体实例都将在 IDE 调试器中显示为 JSON，使其使用起来非常方便。
+- Direct access to the internal variant *names* and *values* arrays from code, by trans-typing into a `TDocVariantData record`;
+- 通过转入 TDocVariantData 记录，从代码中直接访问内部变体名称和值数组；
+- Instance life-time is managed by the compiler (like any other `variant` type), without the need to use `interfaces` or explicit `try..finally` blocks;
+- 实例生命周期由编译器管理（与任何其他变体类型一样），无需使用接口或显式 try..finally 块；
+- Optimized to use as little memory and CPU resource as possible (in contrast to most other libraries, it does not allocate one `class` instance per node, but rely on pre-allocated arrays);
+- 优化为使用尽可能少的内存和 CPU 资源（与大多数其他库相比，它不会为每个节点分配一个类实例，而是依赖于预先分配的数组）；
+- Opened to extension of any content storage - for instance, it will perfectly integrate with BSON serialization and custom *MongoDB* types (*ObjectID, RegEx*...), to be used in conjunction with *MongoDB* servers;
+- 开放任何内容存储的扩展 - 例如，它将与 BSON 序列化和自定义 MongoDB 类型（ObjectID、RegEx...）完美集成，与 MongoDB 服务器结合使用；
+- Perfectly integrated with our [Dynamic array wrapper](https://blog.synopse.info/post/2011/03/12/TDynArray-and-Record-compare/load/save-using-fast-RTTI) and its JSON serialization as with the [`record` serialization](https://blog.synopse.info/post/2013/12/10/JSON-record-serialization);
+- 与我们的动态数组包装器及其 JSON 序列化（如记录序列化）完美集成；
+- Designed to work with our *mORMot* ORM: any `TSQLRecord` instance containing such `variant` custom types as published properties will be recognized by the ORM core, and work as expected with any database back-end (storing the content as JSON in a TEXT column);
+- 设计用于与我们的 mORMot ORM 配合使用：任何包含此类变体自定义类型作为已发布属性的 TSQLRecord 实例都将被 ORM 核心识别，并按预期与任何数据库后端配合使用（将内容作为 JSON 存储在 TEXT 列中）；
+- Designed to work with our *mORMot* SOA: any [`interface`-based service](https://blog.synopse.info/post/2012/03/07/Interface-based-services) is able to consume or publish such kind of content, as `variant` kind of parameters;
+- 设计用于与我们的 mORMot SOA 配合使用：任何基于接口的服务都能够使用或发布此类内容，作为参数的变体；
+- Fully integrated with the Delphi IDE: any `variant` instance will be displayed as JSON in the IDE debugger, making it very convenient to work with.
+- 与 Delphi IDE 完全集成：任何变体实例都将在 IDE 调试器中显示为 JSON，使其使用起来非常方便。
 
 To create instances of such `variant`, you can use some easy-to-remember functions:
 
