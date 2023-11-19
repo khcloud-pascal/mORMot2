@@ -1,6 +1,11 @@
+
 /// Framework Core Low-Level Data Processing Functions
 // - this unit is a part of the Open Source Synopse mORMot framework 2,
 // licensed under a MPL/GPL/LGPL three license - see LICENSE.md
+/// 框架核心底层数据处理函数
+// - 该单元是开源 Synopse mORMot 框架 2 的一部分，
+// 根据 MPL/GPL/LGPL 三种许可证进行许可 - 请参阅 LICENSE.md
+
 unit mormot.core.data;
 
 {
@@ -17,6 +22,16 @@ unit mormot.core.data;
     - RawUtf8 String Values Interning and TRawUtf8List
     - Abstract Radix Tree Classes
 
+    所有框架单元共享的低级数据处理功能
+     - 带自定义构造函数的 RTL TPersistent / TInterfacedObject
+     - TSynPersistent* TSyn*列出 TSynLocker 类
+     - 具有适当二进制序列化的 TSynPersistentStore
+     - INI 文件和内存访问
+     - 高效的 RTTI 值二进制序列化和比较
+     - TDynArray 和 TDynArrayHashed 包装器
+     - 整数数组扩展过程
+     - RawUtf8 字符串值实习和 TRawUtf8List
+     - 抽象基数树类
   *****************************************************************************
 }
 
@@ -42,18 +57,23 @@ uses
 
 
 { ************ RTL TPersistent / TInterfacedObject with Custom Constructor }
+{ ************ RTL TPersistent / TInterfacedObject 与自定义构造函数 }
 
 type
-    /// abstract parent class with a virtual constructor, ready to be overridden
+  /// abstract parent class with a virtual constructor, ready to be overridden
   // to initialize the instance
   // - you can specify such a class if you need an object including published
   // properties (like TPersistent) with a virtual constructor (e.g. to
   // initialize some nested class properties)
+  /// 具有虚拟构造函数的抽象父类，准备被重写以初始化实例
+   // - 如果您需要一个包含已发布属性（如 TPersistent）和虚拟构造函数的对象（例如，初始化一些嵌套类属性），则可以指定这样的类
   TPersistentWithCustomCreate = class(TPersistent)
   public
     /// this virtual constructor will be called at instance creation
     // - this constructor does nothing, but is declared as virtual so that
     // inherited classes may safely override this default void implementation
+    /// 这个虚拟构造函数将在实例创建时被调用
+     // - 此构造函数不执行任何操作，但被声明为 virtual，以便继承的类可以安全地覆盖此默认 void 实现
     constructor Create; virtual;
   end;
 
@@ -63,11 +83,15 @@ type
   // - you can specify e.g. such a class to TRestServer.ServiceRegister() if
   // you need an interfaced object with a virtual constructor, ready to be
   // overridden to initialize the instance
+  /// 具有 IInterface 的线程安全实现和虚拟构造函数的抽象父类
+   // - 您可以指定例如 如果您需要一个带有虚拟构造函数的接口对象，则可以将这样的类添加到 TRestServer.ServiceRegister() 中，并准备好重写以初始化实例
   TInterfacedObjectWithCustomCreate = class(TInterfacedObject)
   public
     /// this virtual constructor will be called at instance creation
     // - this constructor does nothing, but is declared as virtual so that
     // inherited classes may safely override this default void implementation
+    /// 这个虚拟构造函数将在实例创建时被调用
+     // - 此构造函数不执行任何操作，但被声明为 virtual，以便继承的类可以安全地覆盖此默认 void 实现
     constructor Create; virtual;
     /// used to mimic TInterfacedObject reference counting
     // - Release=true will call TInterfacedObject._Release
@@ -75,6 +99,10 @@ type
     // - could be used to emulate proper reference counting of the instance
     // via interfaces variables, but still storing plain class instances
     // (e.g. in a global list of instances)
+    /// 用于模仿 TInterfacedObject 引用计数
+     // - Release=true 将调用 TInterfacedObject._Release
+     // - Release=false 将调用 TInterfacedObject._AddRef
+     // - 可用于通过接口变量模拟实例的正确引用计数，但仍存储普通类实例（例如在实例的全局列表中）
     procedure RefCountUpdate(Release: boolean); virtual;
   end;
   {$M-}
@@ -88,12 +116,19 @@ type
   // - using this class will leverage the signature difference between Delphi
   // and FPC, among all supported platforms
   // - the class includes a RefCount integer field
+  /// 一个抽象祖先，用于实现自定义 TInterfacedObject 类
+   // - 默认情况下，不会执行任何操作：除非重写 VirtualQueryInterface 受保护方法，
+   // 否则 QueryInterface 不会检索任何实例，并且 _AddRef/_Release 方法将调用 VirtualAddRef 和 VirtualRelease 纯抽象方法
+   // - 使用此类将在所有支持的平台中利用 Delphi 和 FPC 之间的签名差异
+   // - 该类包含一个 RefCount 整数字段
   TSynInterfacedObject = class(TObject, IUnknown)
   protected
     fRefCount: integer;
     // returns E_NOINTERFACE by default
+    // 默认返回E_NOINTERFACE
     function VirtualQueryInterface(IID: PGuid; out Obj): TIntQry; virtual;
     // always return 1 for a "non allocated" instance (0 triggers release)
+    // 对于“未分配”实例始终返回 1（0 触发释放）
     function VirtualAddRef: integer;  virtual; abstract;
     function VirtualRelease: integer; virtual; abstract;
     function QueryInterface({$ifdef FPC_HAS_CONSTREF}constref{$else}const{$endif}
@@ -104,8 +139,11 @@ type
     /// this virtual constructor will be called at instance creation
     // - this constructor does nothing, but is declared as virtual so that
     // inherited classes may safely override this default void implementation
+    /// 这个虚拟构造函数将在实例创建时被调用
+     // - 此构造函数不执行任何操作，但被声明为 virtual，以便继承的类可以安全地覆盖此默认 void 实现
     constructor Create; virtual;
     /// the associated reference count
+    /// 关联的引用计数
     property RefCount: integer
       read fRefCount write fRefCount;
   end;
@@ -115,23 +153,33 @@ type
   // expected collection item class to be used on server side
   // - another possibility is to register a TCollection/TCollectionItem pair
   // via a call to Rtti.RegisterCollection()
+  /// 客户端和服务器之间使用的任何 TCollection 都应继承自此类
+   // - 您应该重写 GetClass 虚拟方法以提供要在服务器端使用的预期集合项类
+   // - 另一种可能性是通过调用 Rtti.RegisterCollection() 来注册 TCollection/TCollectionItem 对
   TInterfacedCollection = class(TCollection)
   public
     /// you shall override this abstract method
+    /// 你应该重写这个抽象方法
     class function GetClass: TCollectionItemClass; virtual; abstract;
     /// this constructor will call GetClass to initialize the collection
+    /// 该构造函数将调用 GetClass 来初始化集合
     constructor Create; reintroduce; virtual;
   end;
 
   /// used to determine the exact class type of a TInterfacedObjectWithCustomCreate
   // - could be used to create instances using its virtual constructor
+  /// 用于确定 TInterfacedObjectWithCustomCreate 的确切类类型
+   // - 可用于使用其虚拟构造函数创建实例
   TInterfacedObjectWithCustomCreateClass = class of TInterfacedObjectWithCustomCreate;
 
   /// used to determine the exact class type of a TPersistentWithCustomCreateClass
   // - could be used to create instances using its virtual constructor
+  /// 用于确定 TPersistentWithCustomCreateClass 的确切类类型
+   // - 可用于使用其虚拟构造函数创建实例
   TPersistentWithCustomCreateClass = class of TPersistentWithCustomCreate;
 
   /// class-reference type (metaclass) of a TInterfacedCollection kind
+  /// TInterfacedCollection 类型的类引用类型（元类）
   TInterfacedCollectionClass = class of TInterfacedCollection;
 
 
@@ -139,9 +187,12 @@ type
   // to an existing IAutoFree local variable
   // - WARNING: both FPC and Delphi 10.4+ don't keep the IAutoFree instance
   // up to the end-of-method -> you should not use TAutoFree for new projects :(
+  /// TAutoFree 接口将另一个 TObject 实例注册到现有的 IAutoFree 局部变量
+   // - 警告：FPC 和 Delphi 10.4+ 都不会将 IAutoFree 实例保留到方法结束 -> 您不应该在新项目中使用 TAutoFree :(
   IAutoFree = interface
     procedure Another(var objVar; obj: TObject);
     /// do-nothing method to circumvent the Delphi 10.4 IAutoFree early release
+    /// do-nothing方法规避Delphi 10.4 IAutoFree早期发布
     procedure ForMethod;
   end;
 
@@ -151,18 +202,27 @@ type
   // - be aware that it won't implement a full ARC memory model, but may be
   // just used to avoid writing some try ... finally blocks on local variables
   // - use with caution, only on well defined local scope
+  /// 本地对象的简单引用计数存储
+   // - 警告：FPC 和 Delphi 10.4+ 都不会将 IAutoFree 实例保留到方法结束 -> 您不应该在新项目中使用 TAutoFree :(
+   // - 请注意，它不会实现完整的 ARC 内存模型，但可能只是用于避免在局部变量上编写一些 try ...finally 块
+   // - 谨慎使用，仅在明确定义的本地范围内使用
   TAutoFree = class(TInterfacedObject, IAutoFree)
   protected
     fObject: TObject;
     fObjectList: array of TObject;
     // do-nothing method to circumvent the Delphi 10.4 IAutoFree early release
+    // 什么都不做的方法来规避 Delphi 10.4 IAutoFree 早期版本
     procedure ForMethod;
   public
     /// initialize the TAutoFree class for one local variable
     // - do not call this constructor, but class function One() instead
+    /// 为一个局部变量初始化 TAutoFree 类
+     // - 不要调用此构造函数，而是调用类函数 One()
     constructor Create(var localVariable; obj: TObject); reintroduce; overload;
     /// initialize the TAutoFree class for several local variables
     // - do not call this constructor, but class function Several() instead
+    /// 为几个局部变量初始化 TAutoFree 类
+     // - 不要调用此构造函数，而是调用类函数 Two()
     constructor Create(const varObjPairs: array of pointer); reintroduce; overload;
     /// protect one local TObject variable instance life time
     // - for instance, instead of writing:
@@ -189,6 +249,29 @@ type
     // end of the current method, so we inlined a void method call trying to
     // circumvent this problem - https://quality.embarcadero.com/browse/RSP-30050
     // - for both Delphi 10.4+ and FPC, you may use with TAutoFree.One() do
+    /// 保护一个本地TObject变量实例的生命周期
+     // - 例如，不要写：
+    // !var
+    // !  myVar: TMyClass;
+    // !begin
+    // !  myVar := TMyClass.Create;
+    // !  try
+    // !    ... use myVar
+    // !  finally
+    // !    myVar.Free;
+    // !  end;
+    // !end;
+    // - you may write:
+    // !var
+    // !  myVar: TMyClass;
+    // !begin
+    // !  TAutoFree.One(myVar,TMyClass.Create);
+    // !  ... use myVar
+    // !end; // here myVar will be released
+     // - 警告：在 FPC 下，您应该将此方法的结果分配给本地 IAutoFree 变量 - 请参阅错误 http://bugs.freepascal.org/view.php?id=26602
+     // - Delphi 10.4 也确实对其进行了更改，并在当前方法结束之前释放了 IAutoFree，因此我们内联了一个 void 方法调用，
+     // 试图规避此问题 - https://quality.embarcadero.com/browse/RSP-30050
+     // - 对于 Delphi 10.4+ 和 FPC，您可以与 TAutoFree.One() 一起使用
     class function One(var localVariable; obj: TObject): IAutoFree;
       {$ifdef ISDELPHI104} inline; {$endif}
     /// protect several local TObject variable instances life time
@@ -210,9 +293,36 @@ type
     // !  TAutoFree.Several([
     // !    @var1,TMyClass.Create,
     // !    @var2,TMyClass.Create]).ForMethod;
+    /// 保护几个本地TObject变量实例的生命周期
+     // - 指定为 localVariable/objectInstance 对
+     // - 你可以写：
+    // !var
+    // !  var1, var2: TMyClass;
+    // !begin
+    // !  TAutoFree.Several([
+    // !    @var1,TMyClass.Create,
+    // !    @var2,TMyClass.Create]);
+    // !  ... use var1 and var2
+    // !end; // here var1 and var2 will be released
+     // - 警告：在 FPC 下，您应该将此方法的结果分配给本地 IAutoFree 变量 - 请参阅错误 http://bugs.freepascal.org/view.php?id=26602
+     // - Delphi 10.4 也确实对其进行了更改，并在当前方法结束之前释放了 IAutoFree，并且 Delphi 编译器无法内联“指针数组”，因此您应该显式调用 ForMethod：
+    // !  TAutoFree.Several([
+    // !    @var1,TMyClass.Create,
+    // !    @var2,TMyClass.Create]).ForMethod;
     class function Several(const varObjPairs: array of pointer): IAutoFree;
     /// protect another TObject variable to an existing IAutoFree instance life time
     // - you may write:
+    // !var
+    // !  var1, var2: TMyClass;
+    // !  auto: IAutoFree;
+    // !begin
+    // !  auto := TAutoFree.One(var1,TMyClass.Create);,
+    // !  .... do something
+    // !  auto.Another(var2,TMyClass.Create);
+    // !  ... use var1 and var2
+    // !end; // here var1 and var2 will be released
+    /// 保护另一个 TObject 变量到现有 IAutoFree 实例的生命周期
+     // - 你可以写：
     // !var
     // !  var1, var2: TMyClass;
     // !  auto: IAutoFree;
@@ -227,11 +337,14 @@ type
     // - note that releasing the TObject instances won't be protected, so
     // any exception here may induce a memory leak: use only with "safe"
     // simple objects, e.g. mORMot's TOrm
+    /// 将最终确定关联的 TObject 实例
+     // - 请注意，释放 TObject 实例不会受到保护，因此此处的任何异常都可能导致内存泄漏：仅与“安全”简单对象一起使用，例如 mORMot's TOrm
     destructor Destroy; override;
   end;
 
 
   /// an interface used by TAutoLocker to protect multi-thread execution
+  /// TAutoLocker用来保护多线程执行的接口
   IAutoLocker = interface
     ['{97559643-6474-4AD3-AF72-B9BB84B4955D}']
     /// enter the mutex
@@ -246,9 +359,22 @@ type
     // !    fSharedAutoLocker.Leave;
     // !  end;
     // !end;
+    /// 输入互斥体
+     // - 对 Enter 的任何调用都应以对 Leave 的调用结束，并由 try..finally 块保护，如下所示：
+    // !begin
+    // !  ... // unsafe code
+    // !  fSharedAutoLocker.Enter;
+    // !  try
+    // !    ... // thread-safe code
+    // !  finally
+    // !    fSharedAutoLocker.Leave;
+    // !  end;
+    // !end;
     procedure Enter;
     /// leave the mutex
     // - any call to Leave should be preceded with a call to Enter
+    /// 保留互斥锁
+     // - 任何对 Leave 的调用都应该在对 Enter 的调用之前进行
     procedure Leave;
     /// will enter the mutex until the IUnknown reference is released
     // - using an IUnknown interface to let the compiler auto-generate a
@@ -276,8 +402,33 @@ type
     // !    ... // thread-safe code
     // !  end; // local hidden IUnknown will release the lock for the method
     // !end;
+    /// 将进入互斥锁，直到 IUnknown 引用被释放
+     // - 使用 IUnknown 接口让编译器自动生成 try..finally 块语句来释放代码块的锁
+     // - 可以在 Delphi 下这样使用：
+    // !begin
+    // !  ... // unsafe code
+    // !  fSharedAutoLocker.ProtectMethod;
+    // !  ... // thread-safe code
+    // !end; // local hidden IUnknown will release the lock for the method
+     // - 警告：在 FPC 下，您应该将其结果分配给局部变量 - 请参阅错误 http://bugs.freepascal.org/view.php?id=26602
+    // !var
+    // !  LockFPC: IUnknown;
+    // !begin
+    // !  ... // unsafe code
+    // !  LockFPC := fSharedAutoLocker.ProtectMethod;
+    // !  ... // thread-safe code
+    // !end; // LockFPC will release the lock for the method
+     // 或者
+    // !begin
+    // !  ... // unsafe code
+    // !  with fSharedAutoLocker.ProtectMethod do
+    // !  begin
+    // !    ... // thread-safe code
+    // !  end; // local hidden IUnknown will release the lock for the method
+    // !end;
     function ProtectMethod: IUnknown;
     /// gives an access to the internal low-level TSynLocker instance used
+    /// 提供对所使用的内部低级 TSynLocker 实例的访问
     function Safe: PSynLocker;
   end;
 
@@ -291,13 +442,21 @@ type
   // injected
   // - consider inherit from high-level TSynPersistentLock or call low-level
   // fSafe := NewSynLocker / fSafe^.DoneAndFreemem instead
+  /// 引用计数块代码临界区
+   // - 您可以使用此实例的一个实例来保护多线程执行
+   // - 主类可以在Create中初始化一个IAutoLocker属性，然后在任何方法中调用IAutoLocker.ProtectMethod以使其执行线程安全
+   // - 此类继承自 TInterfacedObjectWithCustomCreate，因此您可以定义 mormot.core.interface.pas 的一个已发布属性
+   // TInjectableObject 作为 IAutoLocker 以便可以自动注入该类 - 考虑从高级 TSynPersistentLock 继承或调用低级
+   // fSafe := NewSynLocker / fSafe^.DoneAndFreemem 代替
   TAutoLocker = class(TInterfacedObjectWithCustomCreate, IAutoLocker)
   protected
     fSafe: TSynLocker;
   public
     /// initialize the mutex
+    /// 初始化互斥体
     constructor Create; override;
     /// finalize the mutex
+    /// 完成互斥锁
     destructor Destroy; override;
     /// will enter the mutex until the IUnknown reference is released
     // - as expected by IAutoLocker interface
@@ -324,6 +483,30 @@ type
     // !    ... // thread-safe code
     // !  end; // local hidden IUnknown will release the lock for the method
     // !end;
+    /// 将进入互斥锁，直到 IUnknown 引用被释放
+     // - 正如 IAutoLocker 接口所期望的那样
+     // - 可以在 Delphi 下这样使用：
+    // !begin
+    // !  ... // unsafe code
+    // !  fSharedAutoLocker.ProtectMethod;
+    // !  ... // thread-safe code
+    // !end; // local hidden IUnknown will release the lock for the method
+     // - 警告：在 FPC 下，您应该将其结果分配给局部变量 - 请参阅错误 http://bugs.freepascal.org/view.php?id=26602
+    // !var
+    // !  LockFPC: IUnknown;
+    // !begin
+    // !  ... // unsafe code
+    // !  LockFPC := fSharedAutoLocker.ProtectMethod;
+    // !  ... // thread-safe code
+    // !end; // LockFPC will release the lock for the method
+     // 或者
+    // !begin
+    // !  ... // unsafe code
+    // !  with fSharedAutoLocker.ProtectMethod do
+    // !  begin
+    // !    ... // thread-safe code
+    // !  end; // local hidden IUnknown will release the lock for the method
+    // !end;
     function ProtectMethod: IUnknown;
     /// enter the mutex
     // - as expected by IAutoLocker interface
@@ -338,15 +521,33 @@ type
     // !    fSharedAutoLocker.Leave;
     // !  end;
     // !end;
+    /// 输入互斥体
+     // - 正如 IAutoLocker 接口所期望的那样
+     // - 对 Enter 的任何调用都应以对 Leave 的调用结束，并由 try..finally 块保护，如下所示：
+    // !begin
+    // !  ... // unsafe code
+    // !  fSharedAutoLocker.Enter;
+    // !  try
+    // !    ... // thread-safe code
+    // !  finally
+    // !    fSharedAutoLocker.Leave;
+    // !  end;
+    // !end;
     procedure Enter; virtual;
     /// leave the mutex
     // - as expected by IAutoLocker interface
+    /// 保留互斥锁
+     // - 正如 IAutoLocker 接口所期望的那样
     procedure Leave; virtual;
     /// access to the locking methods of this instance
     // - as expected by IAutoLocker interface
+    /// 访问该实例的锁定方法
+     // - 正如 IAutoLocker 接口所期望的那样
     function Safe: PSynLocker;
     /// direct access to the locking methods of this instance
     // - faster than IAutoLocker.Safe function
+    /// 直接访问该实例的锁定方法
+     // - 比 IAutoLocker.Safe 函数更快
     property Locker: TSynLocker
       read fSafe;
   end;
@@ -354,6 +555,7 @@ type
 
 
 { ************ TSynPersistent* TSyn*List TSynLocker classes }
+{ ************ TSynPersistent* TSyn*列出 TSynLocker 类 }
 
 type
   /// our own empowered TPersistent-like parent class
@@ -364,24 +566,34 @@ type
   // - features some protected methods to customize its JSON serialization
   // - for best performance, any type inheriting from this class will bypass
   // some regular steps: do not implement interfaces or use TMonitor with them!
+  /// 我们自己的类似TPersistent的父类
+   // - 由于引入了一个巨大的锁来管理属性名称修复解析（我们不会在 VCL 之外使用），TPercient 会产生意想不到的速度开销
+   // - 该类有一个虚拟构造函数，因此是 TPersistent 和 TPercientWithCustomCreate 类的首选替代品
+   // - 采用一些受保护的方法来自定义其 JSON 序列化
+   // - 为了获得最佳性能，从此类继承的任何类型都将绕过一些常规步骤：不要实现接口或与它们一起使用 TMonitor！
   TSynPersistent = class(TObjectWithCustomCreate)
   protected
     // this default implementation will call AssignError()
+    // 这个默认实现将调用AssignError()
     procedure AssignTo(Dest: TSynPersistent); virtual;
     procedure AssignError(Source: TSynPersistent);
   public
     /// allows to implement a TPersistent-like assignement mechanism
     // - inherited class should override AssignTo() protected method
     // to implement the proper assignment
+    /// 允许实现类似 TPersistent 的分配机制
+     // - 继承的类应该重写AssignTo()受保护的方法来实现正确的赋值
     procedure Assign(Source: TSynPersistent); virtual;
   end;
 
   /// used to determine the exact class type of a TSynPersistent
+  /// 用于确定 TSynPersistent 的确切类类型
   TSynPersistentClass = class of TSynPersistent;
 
 
   {$ifdef HASITERATORS}
   /// abstract pointer Enumerator
+  /// 抽象指针枚举器
   TPointerEnumerator = record
   private
     Curr, After: PPointer;
@@ -391,6 +603,7 @@ type
     function MoveNext: Boolean; inline;
     function GetEnumerator: TPointerEnumerator; inline;
     /// returns the current pointer value
+    /// 返回当前指针值
     property Current: pointer
       read GetCurrent;
   end;
@@ -402,6 +615,9 @@ type
   // basic process, and can't be easily inherited
   // - stateless methods (like Add/Clear/Exists/Remove) are defined as virtual
   // since can be overriden e.g. by TSynObjectListLocked to add a TSynLocker
+  /// 简单高效的TList，无需任何通知
+   // - 常规 TList 有一个内部通知机制，会减慢基本进程，并且不能轻易继承
+   // - 无状态方法（如 Add/Clear/Exists/Remove）被定义为虚拟方法，因为可以被覆盖，例如 通过 TSynObjectListLocked 添加一个 TSynLocker
   TSynList = class(TObject)
   protected
     fCount: integer;
@@ -410,34 +626,47 @@ type
       {$ifdef HASINLINE}inline;{$endif}
   public
     /// virtual constructor called at instance creation
+    /// 在实例创建时调用虚拟构造函数
     constructor Create; virtual;
     /// add one item to the list
+    /// 添加一项到列表中
     function Add(item: pointer): PtrInt; virtual;
     /// insert one item to the list at a given position
+    /// 将一项插入到列表的给定位置
     function Insert(item: pointer; index: PtrInt): PtrInt;
     /// delete all items of the list
+    /// 删除列表中的所有项目
     procedure Clear; virtual;
     /// delete one item from the list
+    /// 从列表中删除一项
     procedure Delete(index: integer; dontfree: boolean = false); virtual;
     /// fast retrieve one item in the list
+    /// 快速检索列表中的一项
     function IndexOf(item: pointer): PtrInt; virtual;
     /// fast check if one item exists in the list
+    /// 快速检查列表中是否存在一项
     function Exists(item: pointer): boolean; virtual;
     /// fast delete one item in the list
+    /// 快速删除列表中的一项
     function Remove(item: pointer): PtrInt; virtual;
     {$ifdef HASITERATORS}
     /// an enumerator able to compile "for .. in list do" statements
+    /// 能够编译“for .. in list do”语句的枚举器
     function GetEnumerator: TPointerEnumerator;
     {$endif HASITERATORS}
     /// how many items are stored in this TList instance
+    /// 此 TList 实例中存储了多少项
     property Count: integer
       read fCount;
     /// low-level access to the items stored in this TList instance
+    /// 对此 TList 实例中存储的项目进行低级访问
     property List: TPointerDynArray
       read fList;
     /// low-level array-like access to the items stored in this TList instance
     // - warning: if index is out of range, will return nil and won't raise
     // any exception
+    /// 对此 TList 实例中存储的项目进行低级数组式访问
+     // - 警告：如果索引超出范围，将返回 nil 并且不会引发任何异常
     property Items[index: integer]: pointer
       read Get; default;
   end;
@@ -445,6 +674,7 @@ type
   PSynList = ^TSynList;
 
   /// simple and efficient TObjectList, without any notification
+  /// 简单高效的TObjectList，无需任何通知
   TSynObjectList = class(TSynList)
   protected
     fOwnObjects: boolean;
@@ -452,33 +682,47 @@ type
   public
     /// initialize the object list
     // - can optionally specify an item class for efficient JSON serialization
+    /// 初始化对象列表
+     // - 可以选择指定项目类以实现高效的 JSON 序列化
     constructor Create(aOwnObjects: boolean = true;
       aItemClass: TClass = nil); reintroduce; virtual;
     /// delete one object from the list
     // - will also Free the item if OwnObjects was set, and dontfree is false
+    /// 从列表中删除一个对象
+     // - 如果设置了 OwnObjects 并且 dontfree 为 false，也会释放该项目
     procedure Delete(index: integer; dontfree: boolean = false); override;
     /// delete all objects of the list
+    /// 删除列表中的所有对象
     procedure Clear; override;
     /// delete all objects of the list in reverse order
     // - for some kind of processes, owned objects should be removed from the
     // last added to the first
     // - will use slower but safer FreeAndNilSafe() instead of plain Free
+    /// 按相反顺序删除列表中的所有对象
+     // - 对于某些类型的进程，拥有的对象应该从最后添加到第一个中删除
+     // - 将使用更慢但更安全的 FreeAndNilSafe() 而不是普通的 Free
     procedure ClearFromLast; virtual;
     /// finalize the store items
+    /// 完成商店项目
     destructor Destroy; override;
     /// create a new ItemClass instance, Add() it and return it
+    /// 创建一个新的 ItemClass 实例，Add() 它并返回它
     function NewItem: pointer;
     /// optional class of the stored items
     // - used e.g. by _JL_TSynObjectList() when unserializing from JSON
+    /// 存储项的可选类
+     // - 例如使用 从 JSON 反序列化时通过 _JL_TSynObjectList()
     property ItemClass: TClass
       read fItemClass write fItemClass;
     /// flag set if this list will Free its items on Delete/Clear/Destroy
+    /// 如果此列表将在Delete/Clear/Destroy时释放其项目，则设置标志
     property OwnObjects: boolean
       read fOwnObjects write fOwnObjects;
   end;
   PSynObjectList = ^TSynObjectList;
 
   /// meta-class of TSynObjectList type
+  /// TSynObjectList 类型的元类
   TSynObjectListClass = class of TSynObjectList;
 
   /// adding locking methods to a TSynPersistent with virtual constructor
@@ -487,54 +731,74 @@ type
   // and is cross-compiler whereas TMonitor is Delphi-specific and buggy (at
   // least before XE5)
   // - if you don't need TSynPersistent overhead, consider plain TSynLocked class
+  /// 使用虚拟构造函数向 TSynPersistent 添加锁定方法
+   // - 您可以使用此类而不是 RTL TCriticalSection，因为它将使用不受 CPU 缓存行冲突影响的 TSynLocker，
+   // 并且是交叉编译器，而 TMonitor 是 Delphi 特定的且存在错误（至少在 XE5 之前）
+   // - 如果您不需要 TSynPersistent 开销，请考虑普通 TSynLocked 类
   TSynPersistentLock = class(TSynPersistent)
   protected
     // TSynLocker would increase inherited fields offset -> managed PSynLocker
+    // TSynLocker 会增加继承字段 offset -> 托管 PSynLocker
     fSafe: PSynLocker;
     // will lock/unlock the instance during JSON serialization of its properties
+    // 将在其属性的 JSON 序列化期间锁定/解锁实例
     function RttiBeforeWriteObject(W: TTextWriter;
       var Options: TTextWriterWriteObjectOptions): boolean; override;
     procedure RttiAfterWriteObject(W: TTextWriter;
       Options: TTextWriterWriteObjectOptions); override;
     // set the rcfHookWrite flag to call RttiBeforeWriteObject
+    // 设置rcfHookWrite标志来调用RttiBeforeWriteObject
     class procedure RttiCustomSetParser(Rtti: TRttiCustom); override;
   public
     /// initialize the instance, and its associated lock
+    /// 初始化实例及其关联的锁
     constructor Create; override;
     /// finalize the instance, and its associated lock
+    /// 完成实例及其关联的锁
     destructor Destroy; override;
     /// access to the associated instance critical section
     // - call Safe.Lock/UnLock to protect multi-thread access on this storage
+    /// 访问关联实例的临界区
+     // - 调用 Safe.Lock/UnLock 来保护此存储上的多线程访问
     property Safe: PSynLocker
       read fSafe;
     /// could be used as a short-cut to Safe.Lock
+    /// 可用作 Safe.Lock 的快捷方式
     procedure Lock;
       {$ifdef HASINLINE}inline;{$endif}
     /// could be used as a short-cut to Safe.UnLock
+    /// 可用作 Safe.UnLock 的快捷方式
     procedure Unlock;
       {$ifdef HASINLINE}inline;{$endif}
   end;
 
   /// adding light non-upgradable multiple Read / exclusive Write locking
   // methods to a TSynPersistent with virtual constructor
+  /// 使用虚拟构造函数将轻型不可升级的多个读取/独占写入锁定方法添加到 TSynPersistent
   TSynPersistentRWLightLock = class(TSynPersistent)
   protected
     fSafe: TRWLightLock;
   public
     /// access to the associated non-upgradable TRWLightLock instance
     // - call Safe methods to protect multi-thread access on this storage
+    /// 访问关联的不可升级 TRWLightLock 实例
+     // - 调用安全方法来保护此存储上的多线程访问
     property Safe: TRWLightLock
       read fSafe;
   end;
 
   /// adding light upgradable multiple Read / exclusive Write locking methods
   // to a TSynPersistent with virtual constructor
+  /// 添加轻量级可升级的多个读/独占写锁定方法
+   // 到带有虚拟构造函数的 TSynPersistent
   TSynPersistentRWLock = class(TSynPersistent)
   protected
     fSafe: TRWLock;
   public
     /// access to the associated upgradable TRWLock instance
     // - call Safe methods to protect multi-thread access on this storage
+    /// 访问关联的可升级 TRWLock 实例
+     // - 调用安全方法来保护此存储上的多线程访问
     property Safe: TRWLock
       read fSafe;
   end;
@@ -542,31 +806,39 @@ type
   {$ifndef PUREMORMOT2}
 
   /// used for backward compatibility only with existing code
+  /// 仅用于向后兼容现有代码
   TSynPersistentLocked = class(TSynPersistentLock);
 
   {$endif PUREMORMOT2}
 
   /// adding locking methods to a TInterfacedObject with virtual constructor
+  /// 使用虚拟构造函数向 TInterfacedObject 添加锁定方法
   TInterfacedObjectLocked = class(TInterfacedObjectWithCustomCreate)
   protected
-    fSafe: PSynLocker; // TSynLocker would increase inherited fields offset
+    fSafe: PSynLocker; // TSynLocker would increase inherited fields offset  （TSynLocker 会增加继承字段的偏移量）
   public
     /// initialize the object instance, and its associated lock
+    /// 初始化对象实例及其关联的锁
     constructor Create; override;
     /// release the instance (including the locking resource)
+    /// 释放实例（包括锁定资源）
     destructor Destroy; override;
     /// access to the locking methods of this instance
     // - use Safe.Lock/TryLock with a try ... finally Safe.Unlock block
+    /// 访问该实例的锁定方法
+     // - 将 Safe.Lock/TryLock 与 try ...finally Safe.Unlock 块一起使用
     property Safe: PSynLocker
       read fSafe;
   end;
 
   /// adding light locking methods to a TInterfacedObject with virtual constructor
+  /// 使用虚拟构造函数向 TInterfacedObject 添加轻量级锁定方法
   TInterfacedObjectRWLocked = class(TInterfacedObjectWithCustomCreate)
   protected
     fSafe: TRWLock;
   public
     /// access to the multiple Read / exclusive Write locking methods of this instance
+    /// 访问该实例的多个读/独占写锁定方法
     property Safe: TRWLock
       read fSafe;
   end;
@@ -576,6 +848,9 @@ type
   // - you need to call the Safe locking methods by hand to protect the
   // execution of all methods, since even Add/Clear/ClearFromLast/Remove/Exists
   // have not been overriden because TRWLighLock.WriteLock is not reentrant
+  /// 将 TRWLightLock 不可升级方法添加到 TSynObjectList
+   // - 此类扩展常规 TSynObjectList 以包含 TRWLightLock
+   // - 您需要手动调用安全锁定方法来保护所有方法的执行，因为即使 Add/Clear/ClearFromLast/Remove/Exists 也没有被覆盖，因为 TRWLighLock.WriteLock 不可重入
   TSynObjectListLightLocked = class(TSynObjectList)
   protected
     fSafe: TRWLightLock;
@@ -584,6 +859,9 @@ type
     // - could be used to protect shared resources within the internal process,
     // for index-oriented methods like Delete/Items/Count...
     // - use Safe LightLock methods with a try ... finally bLightLock
+    /// 与此列表关联的单灯读/独占写 LightLock
+     // - 可用于保护内部进程内的共享资源，适用于面向索引的方法，例如删除/项目/计数...
+     // - 尝试使用 Safe LightLock 方法...最后 bLightLock
     property Safe: TRWLightLock
       read fSafe;
   end;
@@ -596,50 +874,72 @@ type
   // - on the other hand, Add/Clear/ClearFromLast/Remove stateless methods have
   // been overriden in this class to call Safe lock methods, and therefore are
   // thread-safe and protected to any background change
+  /// 将 TRWLock 可升级方法添加到 TSynObjectList
+   // - 此类扩展常规 TSynObjectList 以包含 TRWLock
+   // - 您需要手动调用安全锁定方法来保护面向索引的方法的执行（例如Delete/Items/Count...）：列表内容可能会在后台发生变化，因此使用索引是线程安全的
+   // - 另一方面，Add/Clear/ClearFromLast/Remove 无状态方法已在此类中被重写以调用 Safe lock 方法，因此是线程安全的并受到任何后台更改的保护
   TSynObjectListLocked = class(TSynObjectList)
   protected
     fSafe: TRWLock;
   public
     /// add one item to the list using Safe.WriteLock
+    /// 使用 Safe.WriteLock 将一项添加到列表中
     function Add(item: pointer): PtrInt; override;
     /// delete all items of the list using Safe.WriteLock
+    /// 使用 Safe.WriteLock 删除列表中的所有项目
     procedure Clear; override;
     /// delete all items of the list in reverse order, using Safe.WriteLock
+    /// 使用 Safe.WriteLock 按相反顺序删除列表中的所有项目
     procedure ClearFromLast; override;
     /// fast delete one item in the list, using Safe.WriteLock
+    /// 使用 Safe.WriteLock 快速删除列表中的一项
     function Remove(item: pointer): PtrInt; override;
     /// check an item using Safe.ReadOnlyLock
+    /// 使用 Safe.ReadOnlyLock 检查项目
     function Exists(item: pointer): boolean; override;
     /// the light single Read / exclusive Write lock associated to this list
     // - could be used to protect shared resources within the internal process,
     // for index-oriented methods like Delete/Items/Count...
     // - use Safe lock methods within a try ... finally block
+    /// 与此列表关联的轻单读/独占写锁
+     // - 可用于保护内部进程内的共享资源，适用于面向索引的方法，例如删除/项目/计数...
+     // - 在 try ...finally 块中使用安全锁方法
     property Safe: TRWLock
       read fSafe;
   end;
 
   /// event used by TSynObjectListSorted to compare its instances
+  /// TSynObjectListSorted 用于比较其实例的事件
   TOnObjectCompare = function(A, B: TObject): integer;
 
   /// an ordered thread-safe TSynObjectList
   // - items will be stored in order, for O(log(n)) fast search
+  /// 一个有序的线程安全 TSynObjectList
+   // - 项目将按顺序存储，以实现 O(log(n)) 快速搜索
   TSynObjectListSorted = class(TSynObjectListLocked)
   protected
     fCompare: TOnObjectCompare;
     // returns TRUE and the index of existing Item, or FALSE and the index
     // where the Item is to be inserted so that the array remains sorted
+    // 返回 TRUE 和现有 Item 的索引，或返回 FALSE 和要插入 Item 的索引，以便数组保持排序状态
     function Locate(item: pointer; out index: PtrInt): boolean;
   public
     /// initialize the object list to be sorted with the supplied function
+    /// 使用提供的函数初始化要排序的对象列表
     constructor Create(const aCompare: TOnObjectCompare;
       aOwnsObjects: boolean = true); reintroduce;
     /// add in-order one item to the list using Safe.WriteLock
     // - returns the sorted index when item was inserted
     // - returns < 0 if item was found, as -(existingindex + 1)
+    /// 使用 Safe.WriteLock 将按顺序添加一项到列表中
+     // - 返回插入项目时的排序索引
+     // - 如果找到项目，则返回 < 0，如 -(existingindex + 1)
     function Add(item: pointer): PtrInt; override;
     /// fast retrieve one item in the list using O(log(n)) binary search
     // - this overriden version won't search for the item pointer itself,
     // but will use the Compare() function until it is 0
+    /// 使用 O(log(n)) 二分搜索快速检索列表中的一项
+     // - 这个重写版本不会搜索项目指针本身，但会使用 Compare() 函数直到它为 0
     function IndexOf(item: pointer): PtrInt; override;
     /// fast retrieve one item in the list using O(log(n)) binary search
     // - supplied item should have enough information for fCompare to work
@@ -651,11 +951,14 @@ type
 
 
 { ************ TSynPersistentStore with proper Binary Serialization }
+{ ************ 具有适当二进制序列化的 TSynPersistentStore }
 
 type
   /// abstract high-level handling of (SynLZ-)compressed persisted storage
   // - LoadFromReader/SaveToWriter abstract methods should be overriden
   // with proper binary persistence implementation
+  /// (SynLZ-)压缩持久存储的抽象高级处理
+   // - LoadFromReader/SaveToWriter 抽象方法应该用正确的二进制持久性实现重写
   TSynPersistentStore = class(TSynPersistentRWLock)
   protected
     fName: RawUtf8;
@@ -664,37 +967,54 @@ type
     fLoadFromLastUncompressed, fSaveToLastUncompressed: integer;
     fLoadFromLastAlgo: TAlgoCompress;
     /// low-level virtual methods implementing the persistence reading
+    /// 实现持久化读取的低级虚拟方法
     procedure LoadFromReader; virtual;
     procedure SaveToWriter(aWriter: TBufferWriter); virtual;
   public
     /// initialize a void storage with the supplied name
+    /// 使用提供的名称初始化一个空存储
     constructor Create(const aName: RawUtf8); reintroduce; overload; virtual;
     /// initialize a storage from a SaveTo persisted buffer
     // - raise a EFastReader exception on decoding error
+    /// 从 SaveTo 持久缓冲区初始化存储
+     // - 在解码错误时引发 EFastReader 异常
     constructor CreateFrom(const aBuffer: RawByteString;
       aLoad: TAlgoCompressLoad = aclNormal);
     /// initialize a storage from a SaveTo persisted buffer
     // - raise a EFastReader exception on decoding error
+    /// 从 SaveTo 持久缓冲区初始化存储
+     // - 在解码错误时引发 EFastReader 异常
     constructor CreateFromBuffer(aBuffer: pointer; aBufferLen: integer;
       aLoad: TAlgoCompressLoad = aclNormal);
     /// initialize a storage from a SaveTo persisted buffer
     // - raise a EFastReader exception on decoding error
+    /// 从 SaveTo 持久缓冲区初始化存储
+     // - 在解码错误时引发 EFastReader 异常
     constructor CreateFromFile(const aFileName: TFileName;
       aLoad: TAlgoCompressLoad = aclNormal);
     /// fill the storage from a SaveTo persisted buffer
     // - actually call the LoadFromReader() virtual method for persistence
     // - raise a EFastReader exception on decoding error
+    /// 从 SaveTo 持久缓冲区填充存储
+     // - 实际上调用 LoadFromReader() 虚拟方法进行持久化
+     // - 在解码错误时引发 EFastReader 异常
     procedure LoadFrom(const aBuffer: RawByteString;
       aLoad: TAlgoCompressLoad = aclNormal); overload;
     /// initialize the storage from a SaveTo persisted buffer
     // - actually call the LoadFromReader() virtual method for persistence
     // - raise a EFastReader exception on decoding error
+    /// 从 SaveTo 持久缓冲区初始化存储
+     // - 实际上调用 LoadFromReader() 虚拟方法进行持久化
+     // - 在解码错误时引发 EFastReader 异常
     procedure LoadFrom(aBuffer: pointer; aBufferLen: integer;
       aLoad: TAlgoCompressLoad = aclNormal); overload; virtual;
     /// initialize the storage from a SaveToFile content
     // - actually call the LoadFromReader() virtual method for persistence
     // - returns false if the file is not found, true if the file was loaded
     // without any problem, or raise a EFastReader exception on decoding error
+    /// 从 SaveToFile 内容初始化存储
+     // - 实际上调用 LoadFromReader() 虚拟方法进行持久化
+     // - 如果未找到文件则返回 false，如果文件加载没有任何问题则返回 true，或者在解码错误时引发 EFastReader 异常
     function LoadFromFile(const aFileName: TFileName;
       aLoad: TAlgoCompressLoad = aclNormal): boolean;
     /// persist the content as a SynLZ-compressed binary blob
@@ -702,11 +1022,18 @@ type
     // - actually call the SaveToWriter() protected virtual method for persistence
     // - you can specify ForcedAlgo if you want to override the default AlgoSynLZ
     // - BufferOffset could be set to reserve some bytes before the compressed buffer
+    /// 将内容保留为 SynLZ 压缩的二进制 blob
+     // - 稍后通过 LoadFrom 方法检索
+     // - 实际上调用 SaveToWriter() 受保护的虚拟方法进行持久化
+     // - 如果你想覆盖默认的 AlgoSynLZ，你可以指定 ForcedAlgo
+     // - BufferOffset 可以设置为在压缩缓冲区之前保留一些字节
     procedure SaveTo(out aBuffer: RawByteString; nocompression: boolean = false;
       BufLen: integer = 65536; ForcedAlgo: TAlgoCompress = nil;
       BufferOffset: integer = 0); overload; virtual;
     /// persist the content as a SynLZ-compressed binary blob
     // - just an overloaded wrapper
+    /// 将内容保留为 SynLZ 压缩的二进制 blob
+     // - 只是一个重载的包装器
     function SaveTo(nocompression: boolean = false; BufLen: integer = 65536;
       ForcedAlgo: TAlgoCompress = nil; BufferOffset: integer = 0): RawByteString; overload;
       {$ifdef HASINLINE}inline;{$endif}
@@ -714,16 +1041,24 @@ type
     // - to be retrieved later on via LoadFromFile method
     // - returns the number of bytes of the resulting file
     // - actually call the SaveTo method for persistence
+    /// 将内容保留为 SynLZ 压缩的二进制文件
+     // - 稍后通过 LoadFromFile 方法检索
+     // - 返回结果文件的字节数
+     // - 实际上调用 SaveTo 方法进行持久化
     function SaveToFile(const aFileName: TFileName; nocompression: boolean = false;
       BufLen: integer = 65536; ForcedAlgo: TAlgoCompress = nil): PtrUInt;
     /// one optional text associated with this storage
     // - you can define this field as published to serialize its value in log/JSON
+    /// 与此存储关联的一个可选文本
+     // - 您可以将此字段定义为已发布，以在 log/JSON 中序列化其值
     property Name: RawUtf8
       read fName;
     /// after a LoadFrom(), contains the uncompressed data size read
+    /// LoadFrom() 之后，包含读取的未压缩数据大小
     property LoadFromLastUncompressed: integer
       read fLoadFromLastUncompressed;
     /// after a SaveTo(), contains the uncompressed data size written
+    /// SaveTo()之后，包含写入的未压缩数据大小
     property SaveToLastUncompressed: integer
       read fSaveToLastUncompressed;
   end;
@@ -731,6 +1066,7 @@ type
 
 
 { ********** Efficient RTTI Values Binary Serialization and Comparison }
+{ ********** 高效 RTTI 值二进制序列化和比较 }
 
 type
   /// possible options for a TDocVariant JSON/BSON document storage
@@ -779,6 +1115,29 @@ type
   // instances to maintain a list of RawUtf8 names/values for all TDocVariant,
   // so that redundant text content will be allocated only once on heap
   // - see JSON_[TDocVariantModel] and all JSON_* constants as useful sets
+  /// TDocVariant JSON/BSON 文档存储的可能选项
+   // - 在此单元中定义以避免与 mormot.core.variants 的循环引用
+   // - dvoIsArray 和 dvoIsObject 将存储“Kind: TDocVariantKind”状态 - 您永远不必直接定义这两个选项
+   // - dvoNameCaseSensitive 将用于每个名称查找 - 这里不区分大小写仅限于 a-z A-Z 0-9 和 _ 字符
+   // - dvoCheckForDuplicatedNames 将用于方法 TDocVariantData.AddValue()，但在变体级别设置属性时不使用：
+   // 为了保持一致性，“aVariant.AB := aValue”将替换名称“AB”的任何先前值
+   // - dvoReturnNullForUnknownProperty 将在从其名称（对于 dvObject 类型的实例）或索引（对于 dvArray 或 dvObject 类型的实例）检索任何值时使用
+   // - 默认情况下，内部值将从一个变体实例按值复制到另一个变体实例，以确保适当的安全性 - 但它可能太慢：
+   // 如果设置 dvoValueCopiedByReference，则内部 TDocVariantData.VValue/VName 实例将被复制 -reference，以避免内存分配，
+   // 但如果您更改某些值，它可能会中断内部进程（因为 VValue/VName 和 VCount 不匹配） - 因此，如果您设置此选项，请确保将内容用作 只读
+   // - 任何注册的自定义类型都可能具有扩展的 JSON 语法（例如 TBsonVariant 对于 MongoDB 类型），
+   // 并且将在 JSON 解析期间进行搜索，除非设置了 dvoJsonParseDoNotTryCustomVariants （稍快）
+   // - 解析器将尝试通过预取一些内容来猜测数组或对象大小：如果您的输入有很多嵌套文档，则可以设置 dvoJsonParseDoNotGuessCount，
+   // 并且首选手动调整大小 - 如果 检测到巨大的物体嵌套
+   // - 默认情况下，它只会处理 {object} 的直接 JSON [array]：但如果您定义 dvoJsonObjectParseWithinString，
+   // 它也会首先尝试取消转义 JSON 字符串，即处理“[array]”或“{object” }" 内容（例如，当从数据库 TEXT 列检索 JSON 时可以使用）- 例如由 VariantLoadJson() 使用
+   // - JSON 序列化将遵循标准布局，除非设置 dvoSerializeAsExtendedJson 以便属性名称不会用双引号转义，
+   // 写入 '{name:"John",age:123}' 而不是 '{"name": "John","age":123}'：此扩展 json 布局
+   // 与 http://docs.mongodb.org/manual/reference/mongodb-extended-json 和 TDocVariant JSON 反序列化 
+   // （也是我们的 SynCrossPlatformJSON 单元）兼容，但是 大多数 JSON 客户端无法识别，例如 AJAX/JavaScript 或 C#/Java
+   // - 默认情况下，仅允许整数/Int64/货币数值，除非设置了 dvoAllowDoubleValue 并尝试进行 32 位浮点转换，在转换过程中可能会损失精度
+   // - dvoInternNames 和 dvoInternValues 将使用共享 TRawUtf8Interning 实例来维护所有 TDocVariant 的 RawUtf8 名称/值列表，以便冗余文本内容将仅在堆上分配一次
+   // - 将 JSON_[TDocVariantModel] 和所有 JSON_* 常量视为有用的集合
   TDocVariantOption = (
     dvoIsArray,
     dvoIsObject,
@@ -800,14 +1159,24 @@ type
   // JSON_FAST_FLOAT) as potential values
   // - when specifying the options, you should not include dvoIsArray nor
   // dvoIsObject directly in the set, but explicitly define TDocVariantDataKind
+  /// TDocVariant 存储的选项集
+   // - 在此单元中定义以避免与 mormot.core.variants 的循环引用
+   // - 请参阅 JSON_[TDocVariantModel] 和所有 JSON_* 常量（例如 JSON_FAST 或
+   // JSON_FAST_FLOAT) 作为潜在值
+   // - 指定选项时，不应包含 dvoIsArray 或
+   // dvoIsObject 直接在集合中，但显式定义 TDocVariantDataKind
   TDocVariantOptions = set of TDocVariantOption;
 
   /// pointer to a set of options for a TDocVariant storage
   // - defined in this unit to avoid circular reference with mormot.core.variants
   // - use e.g. @JSON_[mFast], @JSON_[mDefault], or any other TDocVariantModel
+  /// 指向 TDocVariant 存储的一组选项的指针
+   // - 在此单元中定义以避免与 mormot.core.variants 的循环引用
+   // - 使用例如 @JSON_[mFast]、@JSON_[mDefault] 或任何其他 TDocVariantModel
   PDocVariantOptions = ^TDocVariantOptions;
 
   /// a boolean array of TDocVariant storage options
+  /// TDocVariant 存储选项的布尔数组
   TDocVariantOptionsBool = array[boolean] of TDocVariantOptions;
   PDocVariantOptionsBool = ^TDocVariantOptionsBool;
 
@@ -817,10 +1186,15 @@ type
   // - i.e. the kind of functions called via RTTI_BINARYSAVE[] lookup table
   // - work with managed and unmanaged types
   // - persist Data^ into Dest, returning the size in Data^ as bytes
+  /// 用于任何 RTTI 类型值的二进制持久性的内部函数处理程序
+   // - 即通过 RTTI_BINARYSAVE[] 查找表调用的函数类型
+   // - 使用托管和非托管类型
+   // - 将 Data^ 持久保存到 Dest 中，以字节形式返回 Data^ 中的大小
   TRttiBinarySave = function(Data: pointer; Dest: TBufferWriter;
     Info: PRttiInfo): PtrInt;
 
   /// the type of RTTI_BINARYSAVE[] efficient lookup table
+  /// RTTI_BINARYSAVE[]类型高效查找表
   TRttiBinarySaves = array[TRttiKind] of TRttiBinarySave;
   PRttiBinarySaves = ^TRttiBinarySaves;
 
@@ -828,10 +1202,15 @@ type
   // - i.e. the kind of functions called via RTTI_BINARYLOAD[] lookup table
   // - work with managed and unmanaged types
   // - fill Data^ from Source, returning the size in Data^ as bytes
+  /// 用于任何 RTTI 类型值的二进制持久性的内部函数处理程序
+   // - 即通过 RTTI_BINARYLOAD[] 查找表调用的函数类型
+   // - 使用托管和非托管类型
+   // - 从 Source 填充 Data^，以字节形式返回 Data^ 中的大小
   TRttiBinaryLoad = function(Data: pointer; var Source: TFastReader;
     Info: PRttiInfo): PtrInt;
 
   /// the type of RTTI_BINARYLOAD[] efficient lookup table
+  /// RTTI_BINARYLOAD[]类型高效查找表
   TRttiBinaryLoads = array[TRttiKind] of TRttiBinaryLoad;
   PRttiBinaryLoads = ^TRttiBinaryLoads;
 
@@ -839,10 +1218,15 @@ type
   // - i.e. the kind of functions called via RTTI_COMPARE[] lookup table
   // - work with managed and unmanaged types
   // - returns the size in Data1/Data2^ as bytes, and the result in Compared
+  /// 用于快速比较任何 RTTI 类型值的内部函数处理程序
+   // - 即通过 RTTI_COMPARE[] 查找表调用的函数类型
+   // - 使用托管和非托管类型
+   // - 返回 Data1/Data2^ 中的大小（以字节为单位），以及比较结果
   TRttiCompare = function(Data1, Data2: pointer; Info: PRttiInfo;
     out Compared: integer): PtrInt;
 
   /// the type of RTTI_COMPARE[] efficient lookup table
+  /// RTTI_COMPARE[]类型高效查找表
   TRttiCompares = array[TRttiKind] of TRttiCompare;
   PRttiCompares = ^TRttiCompares;
 
@@ -851,29 +1235,44 @@ type
 var
   /// lookup table for binary persistence of any RTTI type value
   // - for efficient persistence into binary of managed and unmanaged types
+  /// 任何 RTTI 类型值的二进制持久性的查找表
+   // - 用于有效持久化托管和非托管类型的二进制文件
   RTTI_BINARYSAVE: TRttiBinarySaves;
 
   /// lookup table for binary persistence of any RTTI type value
   // - for efficient retrieval from binary of managed and unmanaged types
+  /// 任何 RTTI 类型值的二进制持久性的查找表
+   // - 用于从托管和非托管类型的二进制文件中高效检索
   RTTI_BINARYLOAD: TRttiBinaryLoads;
 
   /// lookup table for comparison of any RTTI type value
   // - for efficient search or sorting of managed and unmanaged types
   // - RTTI_COMPARE[false] for case-sensitive comparison
   // - RTTI_COMPARE[true] for case-insensitive comparison
+  /// 用于比较任何 RTTI 类型值的查找表
+   // - 用于托管和非托管类型的高效搜索或排序
+   // - RTTI_COMPARE[false] 用于区分大小写的比较
+   // - RTTI_COMPARE[true] 用于不区分大小写的比较
   RTTI_COMPARE: TRttiComparers;
 
   /// lookup table for comparison of ordinal RTTI type values
   // - slightly faster alternative to RTTI_COMPARE[rkOrdinalTypes]
+  /// 用于比较序数 RTTI 类型值的查找表
+   // - RTTI_COMPARE[rkOrdinalTypes] 的替代方案稍快一些
   RTTI_ORD_COMPARE: array[TRttiOrd] of TRttiCompare;
 
   /// lookup table for comparison of floating-point RTTI type values
   // - slightly faster alternative to RTTI_COMPARE[rkFloat]
+  /// 用于比较浮点 RTTI 类型值的查找表
+   // - RTTI_COMPARE[rkFloat] 的替代方案稍快一些
   RTTI_FLOAT_COMPARE: array[TRttiFloat] of TRttiCompare;
 
 /// raw binary serialization of a dynamic array
 // - as called e.g. by TDynArray.SaveTo, using ExternalCount optional parameter
 // - RTTI_BINARYSAVE[rkDynArray] is a wrapper to this function, with ExternalCount=nil
+/// 动态数组的原始二进制序列化
+// - 称为例如 通过 TDynArray.SaveTo，使用ExternalCount 可选参数
+// - RTTI_BINARYSAVE[rkDynArray] 是此函数的包装器，ExternalCount=nil
 procedure DynArraySave(Data: PAnsiChar; ExternalCount: PInteger;
   Dest: TBufferWriter; Info: PRttiInfo); overload;
 
@@ -881,6 +1280,9 @@ procedure DynArraySave(Data: PAnsiChar; ExternalCount: PInteger;
 // DynArrayLoad() / TDynArray.Load()
 // - Value shall be set to the source dynamic arry field
 // - is a wrapper around BinarySave(rkDynArray)
+/// 将动态数组内容序列化为二进制，准备好由 DynArrayLoad() / TDynArray.Load() 加载
+// - 值应设置为源动态数组字段
+// - 是 BinarySave(rkDynArray) 的包装
 function DynArraySave(var Value; TypeInfo: PRttiInfo): RawByteString; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -888,6 +1290,9 @@ function DynArraySave(var Value; TypeInfo: PRttiInfo): RawByteString; overload;
 // DynArraySave() / TDynArray.Save()
 // - Value shall be set to the target dynamic array field
 // - is a wrapper around BinaryLoad(rkDynArray)
+/// 从 DynArraySave() / TDynArray.Save() 保存的二进制序列化中填充动态数组内容
+// - 值应设置为目标动态数组字段
+// - 是 BinaryLoad(rkDynArray) 的包装器
 function DynArrayLoad(var Value; Source: PAnsiChar; TypeInfo: PRttiInfo;
   {$ifdef PUREMORMOT2} // SourceMax is manadatory for safety
   TryCustomVariants: PDocVariantOptions; SourceMax: PAnsiChar): PAnsiChar;
@@ -900,6 +1305,10 @@ function DynArrayLoad(var Value; Source: PAnsiChar; TypeInfo: PRttiInfo;
 // - as used by DynArrayLoad() and TDynArrayLoadFrom
 // - returns the stored length() of the dynamic array, and Source points to
 // the stored binary data itself
+/// 由 DynArraySave/TDynArray.Save 保存的低级二进制反序列化
+// - 由 DynArrayLoad() 和 TDynArrayLoadFrom 使用
+// - 返回动态数组存储的length()，Source指向
+// 存储的二进制数据本身
 function DynArrayLoadHeader(var Source: TFastReader;
   ArrayInfo, ItemInfo: PRttiInfo): integer;
 
@@ -907,20 +1316,31 @@ function DynArrayLoadHeader(var Source: TFastReader;
 // - as called e.g. by TDynArray.Equals, using ExternalCountA/B optional parameter
 // - RTTI_COMPARE[true/false,rkDynArray] are wrappers to this, with ExternalCount=nil
 // - if Info=TypeInfo(TObjectDynArray) then will compare any T*ObjArray
+/// 两个动态数组的原始比较
+// - 称为例如 通过 TDynArray.Equals，使用ExternalCountA/B 可选参数
+// - RTTI_COMPARE[true/false,rkDynArray] 是对此的包装，ExternalCount=nil
+// - 如果 Info=TypeInfo(TObjectDynArray) 则将比较任何 T*ObjArray
 function DynArrayCompare(A, B: PAnsiChar; ExternalCountA, ExternalCountB: PInteger;
   Info: PRttiInfo; CaseInSensitive: boolean): integer; overload;
 
 /// wrapper around TDynArray.Add
 // - warning: the Item type is not checked at runtime, so should be as expected
 // - not very fast, but could be useful for simple code
+/// TDynArray.Add 的包装
+// - 警告：项目类型不会在运行时检查，因此应该符合预期
+// - 不是很快，但对于简单代码可能有用
 function DynArrayAdd(TypeInfo: PRttiInfo; var DynArray; const Item): integer; overload;
 
 /// wrapper around TDynArray.Delete
 // - not very fast, but could be useful for simple code
+/// TDynArray.Delete 的包装
+// - 不是很快，但对于简单代码可能有用
 function DynArrayDelete(TypeInfo: PRttiInfo; var DynArray; Index: PtrInt): boolean; overload;
 
 /// compare two dynamic arrays by calling TDynArray.Equals
 // - if Info=TypeInfo(TObjectDynArray) then will compare any T*ObjArray
+/// 通过调用 TDynArray.Equals 比较两个动态数组
+// - 如果 Info=TypeInfo(TObjectDynArray) 则将比较任何 T*ObjArray
 function DynArrayEquals(TypeInfo: PRttiInfo; var Array1, Array2;
   Array1Count: PInteger = nil; Array2Count: PInteger = nil;
   CaseInsensitive: boolean = false): boolean;
@@ -930,18 +1350,25 @@ function DynArrayEquals(TypeInfo: PRttiInfo; var Array1, Array2;
 /// wrapper around TDynArray.Add
 // - warning: the Item type is not checked at runtime, so should be as expected
 // - not very fast, but could be useful for simple code
+/// TDynArray.Add 的包装
+// - 警告：项目类型不会在运行时检查，因此应该符合预期
+// - 不是很快，但对于简单代码可能有用
 function DynArrayAdd<TArray>(var DynArray: TArray; const Item): integer; overload;
 
 /// wrapper around TDynArray.Delete
 // - not very fast, but could be useful for simple code
+/// TDynArray.Delete 的包装
+// - 不是很快，但对于简单代码可能有用
 function DynArrayDelete<TArray>(var DynArray: TArray; Index: PtrInt): boolean; overload;
 
 /// compare two dynamic arrays values
+/// 比较两个动态数组值
 function DynArrayCompare<TArray>(var Array1, Array2: TArray;
   CaseInSensitive: boolean = false): integer; overload;
 {$endif FPCGENERICS}
 
 // some low-level comparison methods used by mormot.core.json
+// mormot.core.json 使用的一些低级比较方法
 function _BC_SQWord(A, B: PInt64; Info: PRttiInfo; out Compared: integer): PtrInt;
 function _BC_UQWord(A, B: PQWord; Info: PRttiInfo; out Compared: integer): PtrInt;
 function _BC_ObjArray(A, B: pointer; Info: PRttiInfo; out Compared: integer): PtrInt;
@@ -949,29 +1376,37 @@ function _BCI_ObjArray(A, B: pointer; Info: PRttiInfo; out Compared: integer): P
 
 /// check equality of two values by content, using RTTI
 // - optionally returns the known in-memory PSize of the value
+/// 使用 RTTI 按内容检查两个值的相等性
+// - 可选择返回该值的已知内存 PSize
 function BinaryEquals(A, B: pointer; Info: PRttiInfo; PSize: PInteger;
   Kinds: TRttiKinds; CaseInSensitive: boolean): boolean;
 
 /// comparison of two values by content, using RTTI
+/// 使用 RTTI 按内容比较两个值
 function BinaryCompare(A, B: pointer; Info: PRttiInfo;
   CaseInSensitive: boolean): integer; overload;
 
 /// comparison of two arrays of values by content, using RTTI
+/// 使用 RTTI 按内容比较两个值数组
 function BinaryCompare(A, B: pointer; Info: PRttiInfo; Count: PtrInt;
   CaseInSensitive: boolean): integer; overload;
 
 /// comparison of two TObject published properties, using RTTI
+/// 使用 RTTI 比较两个 TObject 发布的属性
 function ObjectCompare(A, B: TObject; CaseInSensitive: boolean): integer; overload;
 
 /// comparison of published properties of several TObject instances, using RTTI
+/// 使用 RTTI 比较多个 TObject 实例的已发布属性
 function ObjectCompare(A, B: PObject; Count: PtrInt;
   CaseInsensitive: boolean = false): integer; overload;
 
 /// case-sensitive comparison of two TObject published properties, using RTTI
+/// 使用 RTTI 区分大小写比较两个 TObject 发布的属性
 function ObjectEquals(A, B: TObject): boolean;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// case-insensitive comparison of two TObject published properties, using RTTI
+/// 使用 RTTI 对两个 TObject 已发布属性进行不区分大小写的比较
 function ObjectEqualsI(A, B: TObject): boolean;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -979,47 +1414,61 @@ function ObjectEqualsI(A, B: TObject): boolean;
 
 /// how many bytes a BinarySave() may return
 // - deprecated function - use overloaded BinarySave() functions instead
+/// BinarySave() 可以返回多少字节
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function BinarySaveLength(Data: pointer; Info: PRttiInfo; Len: PInteger;
   Kinds: TRttiKinds): integer; deprecated;
 
 /// binary persistence of any value using RTTI, into a memory buffer
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 使用 RTTI 将任何值二进制持久保存到内存缓冲区中
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function BinarySave(Data: pointer; Dest: PAnsiChar; Info: PRttiInfo;
   out Len: integer; Kinds: TRttiKinds): PAnsiChar; overload; deprecated;
 
 {$endif PUREMORMOT2}
 
 /// binary persistence of any value using RTTI, into a RawByteString buffer
+/// 使用 RTTI 将任何值二进制持久保存到 RawByteString 缓冲区中
 function BinarySave(Data: pointer; Info: PRttiInfo; Kinds: TRttiKinds;
   WithCrc: boolean = false): RawByteString; overload;
 
 /// binary persistence of any value using RTTI, into a TBytes buffer
+/// 使用 RTTI 将任何值二进制持久保存到 TBytes 缓冲区中
 function BinarySaveBytes(Data: pointer; Info: PRttiInfo; Kinds: TRttiKinds): TBytes;
 
 /// binary persistence of any value using RTTI, into a TBufferWriter stream
+/// 使用 RTTI 将任何值二进制持久化到 TBufferWriter 流中
 procedure BinarySave(Data: pointer; Info: PRttiInfo; Dest: TBufferWriter); overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// binary persistence of any value using RTTI, into a TSynTempBuffer buffer
+/// 使用 RTTI 将任何值的二进制持久性保存到 TSynTempBuffer 缓冲区中
 procedure BinarySave(Data: pointer; var Dest: TSynTempBuffer;
   Info: PRttiInfo; Kinds: TRttiKinds; WithCrc: boolean = false); overload;
 
 /// binary persistence of any value using RTTI, into a Base64-encoded text
 // - contains a trailing crc32c hash before the actual data
+/// 使用 RTTI 将任何值二进制持久化为 Base64 编码文本
+// - 在实际数据之前包含尾随 crc32c 哈希值
 function BinarySaveBase64(Data: pointer; Info: PRttiInfo; UriCompatible: boolean;
   Kinds: TRttiKinds; WithCrc: boolean = true): RawUtf8;
 
 /// unserialize any value from BinarySave() memory buffer, using RTTI
+/// 使用 RTTI 反序列化 BinarySave() 内存缓冲区中的任何值
 function BinaryLoad(Data: pointer; Source: PAnsiChar; Info: PRttiInfo;
   Len: PInteger; SourceMax: PAnsiChar; Kinds: TRttiKinds;
   TryCustomVariants: PDocVariantOptions = nil): PAnsiChar; overload;
 
 /// unserialize any value from BinarySave() RawByteString, using RTTI
+/// 使用 RTTI 反序列化 BinarySave() RawByteString 中的任何值
 function BinaryLoad(Data: pointer; const Source: RawByteString; Info: PRttiInfo;
   Kinds: TRttiKinds; TryCustomVariants: PDocVariantOptions = nil): boolean; overload;
 
 /// unserialize any value from BinarySaveBase64() encoding, using RTTI
 // - optionally contains a trailing crc32c hash before the actual data
+/// 使用 RTTI 反序列化 BinarySaveBase64() 编码中的任何值
+// - 可选地在实际数据之前包含尾随 crc32c 哈希值
 function BinaryLoadBase64(Source: PAnsiChar; Len: PtrInt; Data: pointer;
   Info: PRttiInfo; UriCompatible: boolean; Kinds: TRttiKinds;
   WithCrc: boolean = true; TryCustomVariants: PDocVariantOptions = nil): boolean;
@@ -1031,6 +1480,11 @@ function BinaryLoadBase64(Source: PAnsiChar; Len: PtrInt; Data: pointer;
 // - will use binary-level comparison: it could fail to match two floating-point
 // values because of rounding issues (Currency won't have this problem)
 // - is a wrapper around BinaryEquals(rkRecordTypes)
+/// 按内容检查两条记录是否相等
+// - 将处理打包记录，具有二进制（字节、字、整数...）和字符串类型属性
+// - 将使用二进制级比较：由于舍入问题，它可能无法匹配两个浮点值（货币不会有这个问题）
+// - 是 BinaryEquals(rkRecordTypes) 的包装
+
 function RecordEquals(const RecA, RecB; TypeInfo: PRttiInfo;
   PRecSize: PInteger = nil; CaseInSensitive: boolean = false): boolean;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1048,12 +1502,23 @@ function RecordEquals(const RecA, RecB; TypeInfo: PRttiInfo;
 // versions of Delphi, you should use some explicit types like RawUtf8,
 // WinAnsiString, SynUnicode or even RawUnicode/WideString
 // - is a wrapper around BinarySave(rkRecordTypes)
+/// 将一条记录内容保存到RawByteString中
+// - 将处理打包记录，具有二进制（字节、字、整数...）和字符串类型属性（当然不具有内部原始指针）
+// - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，
+// 任何先前序列化的内容都将失败，可能会触发意外的 GPF：您可以使用 TypeInfoToHash() 如果 您在可执行文件之间共享此二进制数据
+// - 警告：在 Delphi 2009 之前将通用字符串字段编码为 AnsiString（每个字符一个字节），
+// 自 Delphi 2009 以来将编码为 UnicodeString（每个字符两个字节）：如果您想在 UNICODE 和 NOT UNICODE 版本之间使用此函数 Delphi，
+// 你应该使用一些显式类型，如 RawUtf8、WinAnsiString、SynUnicode 甚至 RawUnicode/WideString
+// - 是 BinarySave(rkRecordTypes) 的包装
 function RecordSave(const Rec; TypeInfo: PRttiInfo): RawByteString; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// save a record content into a TBytes dynamic array
 // - could be used as an alternative to RawByteString's RecordSave()
 // - is a wrapper around BinarySaveBytes(rkRecordTypes)
+/// 将一条记录内容保存到TBytes动态数组中
+// - 可用作 RawByteString 的 RecordSave() 的替代方法
+// - 是 BinarySaveBytes(rkRecordTypes) 的包装器
 function RecordSaveBytes(const Rec; TypeInfo: PRttiInfo): TBytes;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -1062,6 +1527,9 @@ function RecordSaveBytes(const Rec; TypeInfo: PRttiInfo): TBytes;
 /// compute the number of bytes needed to save a record content
 // using the RecordSave() function
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 计算保存一条记录内容所需的字节数
+// 使用 RecordSave() 函数
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function RecordSaveLength(const Rec; TypeInfo: PRttiInfo;
   Len: PInteger = nil): integer; deprecated;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1069,6 +1537,9 @@ function RecordSaveLength(const Rec; TypeInfo: PRttiInfo;
 /// save a record content into a destination memory buffer
 // - Dest must be at least RecordSaveLength() bytes long
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 将记录内容保存到目标内存缓冲区中
+// - Dest 必须至少为 RecordSaveLength() 字节长
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function RecordSave(const Rec; Dest: PAnsiChar; TypeInfo: PRttiInfo;
   out Len: integer): PAnsiChar; overload; deprecated;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1076,6 +1547,9 @@ function RecordSave(const Rec; Dest: PAnsiChar; TypeInfo: PRttiInfo;
 /// save a record content into a destination memory buffer
 // - Dest must be at least RecordSaveLength() bytes long
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 将记录内容保存到目标内存缓冲区中
+// - Dest 必须至少为 RecordSaveLength() 字节长
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function RecordSave(const Rec; Dest: PAnsiChar; TypeInfo: PRttiInfo): PAnsiChar;
   overload; deprecated; {$ifdef HASINLINE}inline;{$endif}
 
@@ -1084,12 +1558,18 @@ function RecordSave(const Rec; Dest: PAnsiChar; TypeInfo: PRttiInfo): PAnsiChar;
 /// save a record content into a destination memory buffer
 // - caller should make Dest.Done once finished with Dest.buf/Dest.len buffer
 // - is a wrapper around BinarySave(rkRecordTypes)
+/// 将记录内容保存到目标内存缓冲区中
+// - 调用者应在完成 Dest.buf/Dest.len 缓冲区后执行 Dest.Done
+// - 是 BinarySave(rkRecordTypes) 的包装
 procedure RecordSave(const Rec; var Dest: TSynTempBuffer; TypeInfo: PRttiInfo); overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// save a record content into a Base64 encoded UTF-8 text content
 // - will use RecordSave() format, with a left-sided binary CRC
 // - is a wrapper around BinarySaveBase64(rkRecordTypes)
+/// 将一条记录内容保存成Base64编码的UTF-8文本内容
+// - 将使用 RecordSave() 格式，带有左侧二进制 CRC
+// - 是 BinarySaveBase64(rkRecordTypes) 的包装器
 function RecordSaveBase64(const Rec; TypeInfo: PRttiInfo;
   UriCompatible: boolean = false): RawUtf8;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1107,6 +1587,14 @@ function RecordSaveBase64(const Rec; TypeInfo: PRttiInfo;
 // mandatory when decoding the content from any external process (e.g. a
 // maybe-forged client) - with no performance penalty
 // - is a wrapper around BinaryLoad(rkRecordTypes)
+/// 从 RecordSave() 保存的内存缓冲区中填充记录内容
+// - 如果源缓冲区不正确则返回 nil
+// - 如果成功，则返回读取内容之后的内存缓冲区指针，并将 Rec 大小（以字节为单位）设置为 Len 引用变量
+// - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，
+// 任何先前序列化的内容都将失败，可能会触发意外的 GPF：您可以使用 TypeInfoToHash() 如果 您在可执行文件之间共享此二进制数据
+// - 您应该在 SourceMax 中提供 Source 内存缓冲区之后的第一个字节，该字节将用于避免任何意外的缓冲区溢出 - 
+// 在解码来自任何外部进程（例如可能伪造的客户端）的内容时显然是强制的 - 没有性能 惩罚
+// - 是 BinaryLoad(rkRecordTypes) 的包装器
 function RecordLoad(var Rec; Source: PAnsiChar; TypeInfo: PRttiInfo;
   {$ifdef PUREMORMOT2} // SourceMax is manadatory for safety
   Len: PInteger; SourceMax: PAnsiChar;
@@ -1120,6 +1608,10 @@ function RecordLoad(var Rec; Source: PAnsiChar; TypeInfo: PRttiInfo;
 // - will use the Source length to detect and avoid any buffer overlow
 // - returns false if the Source buffer was incorrect, true on success
 // - is a wrapper around BinaryLoad(rkRecordTypes)
+/// 从 RecordSave() 保存的内存缓冲区中填充记录内容
+// - 将使用源长度来检测并避免任何缓冲区溢出
+// - 如果源缓冲区不正确则返回 false，如果成功则返回 true
+// - 是 BinaryLoad(rkRecordTypes) 的包装器
 function RecordLoad(var Rec; const Source: RawByteString;
   TypeInfo: PRttiInfo; TryCustomVariants: PDocVariantOptions = nil): boolean; overload;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1127,6 +1619,9 @@ function RecordLoad(var Rec; const Source: RawByteString;
 /// read a record content from a Base64 encoded content
 // - expects RecordSaveBase64() format, with a left-sided binary CRC32C
 // - is a wrapper around BinaryLoadBase64(rkRecordTypes)
+/// 从Base64编码的内容中读取一条记录内容
+// - 需要 RecordSaveBase64() 格式，带有左侧二进制 CRC32C
+// - 是 BinaryLoadBase64(rkRecordTypes) 的包装器
 function RecordLoadBase64(Source: PAnsiChar; Len: PtrInt; var Rec; TypeInfo: PRttiInfo;
   UriCompatible: boolean = false; TryCustomVariants: PDocVariantOptions = nil): boolean;
   {$ifdef HASINLINE}inline;{$endif}
@@ -1135,11 +1630,15 @@ function RecordLoadBase64(Source: PAnsiChar; Len: PtrInt; var Rec; TypeInfo: PRt
 // - complex string types will make up to 255 uppercase characters conversion
 // if CaseInsensitive is true
 // - you can specify your own hashing function if crc32c is not what you expect
+/// 变体值的基于 crc32c 的哈希值
+// - 如果 CaseInsensitive 为 true，复杂字符串类型将进行最多 255 个大写字符转换
+// - 如果 crc32c 不是您所期望的，您可以指定您自己的散列函数
 function VariantHash(const value: variant; CaseInsensitive: boolean;
   Hasher: THasher = nil): cardinal;
 
 
 { ************ TDynArray and TDynArrayHashed Wrappers }
+{ ************ TDynArray 和 TDynArrayHashed 包装器 }
 
 type
   /// function prototype to be used for TDynArray Sort and Find method
@@ -1151,16 +1650,26 @@ type
   // - any custom type (even records) can be compared then sort by defining
   // such a custom function
   // - must return 0 if A=B, -1 if A<B, 1 if A>B
+  /// 用于 TDynArray Sort 和 Find 方法的函数原型
+   // - 基本类型存在通用函数：参见例如 SortDynArrayBoolean、SordDynArrayByte、SortDynArrayWord、 
+   // SortDynArrayInteger、SortDynArrayCardinal、SortDynArrayInt64、SortDynArrayQWord、
+   // SordDynArraySingle、SordDynArrayDouble、SortDynArrayAnsiString、SortDynArrayAnsiStringI、
+   // SortDynArrayUnicodeString、SortDynArrayUnicodeStringI、SortDynArrayString、SortDynArrayStringI
+   // - 可以比较任何自定义类型（甚至记录），然后通过定义此类自定义函数进行排序
+   // - 如果 A=B 则必须返回 0，如果 A<B，则必须返回 -1，如果 A>B，则必须返回 1
   TDynArraySortCompare = function(const A, B): integer;
 
   /// event oriented version of TDynArraySortCompare
+  /// TDynArraySortCompare 的面向事件版本
   TOnDynArraySortCompare = function(const A, B): integer of object;
 
   /// defined here as forward definition of the TRawUtf8Interning final class
+  /// 此处定义为 TRawUtf8Interning 最终类的前向定义
   TRawUtf8InterningAbstract = class(TSynPersistent);
 
 const
   /// redirect to the proper SortDynArrayAnsiString/SortDynArrayAnsiStringI
+  /// 重定向到正确的 SortDynArrayAnsiString/SortDynArrayAnsiStringI
   SORT_LSTRING: array[{caseins=}boolean] of TDynArraySortCompare = (
     {$ifdef CPUINTEL}
     SortDynArrayAnsiString,
@@ -1175,12 +1684,17 @@ type
   /// internal enumeration used to specify some standard arrays
   // - mORMot 1.18 did have two serialization engines - we unified it
   // - defined only for backward compatible code; use TRttiParserType instead
+  /// 内部枚举用于指定一些标准数组
+   // - mORMot 1.18 确实有两个序列化引擎 - 我们统一了它
+   // - 仅为向后兼容的代码定义； 使用 TRttiParserType 代替
   TDynArrayKind = TRttiParserType;
   TDynArrayKinds = TRttiParserTypes;
 
 const
   /// deprecated TDynArrayKind enumerate mapping
   // - defined only for backward compatible code; use TRttiParserType instead
+  /// 已弃用 TDynArrayKind 枚举映射
+   // - 仅为向后兼容的代码定义； 使用 TRttiParserType 代替
   djNone = ptNone;
   djboolean = ptboolean;
   djByte = ptByte;
@@ -1216,9 +1730,11 @@ const
 
 type
   /// the kind of exceptions raised during TDynArray/TDynArrayHashed process
+  /// TDynArray/TDynArrayHashed 过程中引发的异常类型
   EDynArray = class(ESynException);
 
   /// a pointer to a TDynArray Wrapper instance
+  /// 指向 TDynArray Wrapper 实例的指针
   PDynArray = ^TDynArray;
 
   /// a wrapper around a dynamic array with one dimension
@@ -1236,6 +1752,14 @@ type
   // - is defined as an object or as a record, due to a bug
   // in Delphi 2009/2010 compiler (at least): this structure is not initialized
   // if defined as an object on the stack, but will be as a record :(
+  /// 一维动态数组的包装
+   // - 使用快速 RTTI 信息提供类似 TList 的方法
+   // - 可用于将所有内存内容快速保存/检索到 TStream
+   // - 请注意，“const Item”在编译时和运行时都不会检查：必须确保 Item 与动态数组的元素类型匹配； 为了安全起见，所有 Item*() 方法都将使用指针
+   // - 可以使用外部 Count 存储来使 Add() 和 Delete() 更快（避免大部分内存缓冲区的重新分配）
+   // - 请注意，TDynArray 只是现有动态数组的包装：方法可以修改关联变量的内容，但 TDynArray 本身不包含任何数据。 因此，其目的是根据需要初始化 TDynArray 包装器，以访问任何现有的动态数组。
+   // - 由于错误而被定义为对象或记录
+   // 在 Delphi 2009/2010 编译器中（至少）：如果定义为堆栈上的对象，则不会初始化该结构，但将作为记录:(
   {$ifdef UNDIRECTDYNARRAY}
   TDynArray = record
   {$else}
@@ -1259,6 +1783,7 @@ type
       aCompare: TDynArraySortCompare): PtrInt;
       {$ifdef HASINLINE}inline;{$endif}
     /// faster than RTL + handle T*ObjArray + ensure unique
+    /// 比 RTL 更快 + 处理 T*ObjArray + 确保唯一
     procedure InternalSetLength(OldLength, NewLength: PtrUInt);
   public
     /// initialize the wrapper with a one-dimension dynamic array
@@ -1290,6 +1815,31 @@ type
     // !  for i := 1 to 100000 do
     // !    DA.Add(i); // MUCH faster using the ACount variable
     // ! (...)   // now you should use DA.Count or Count instead of length(A)
+    /// 使用一维动态数组初始化包装器
+     // - 动态数组必须使用其自己的类型进行定义（例如 TIntegerDynArray = 整数数组）
+     // - 如果设置了aCountPointer，将使用它将代替length()来存储动态数组项目计数 - 将项目添加到数组时会快得多， 
+     // 因为动态数组不需要每次都调整大小 - 但在这种情况下，访问数据时应该使用 Count 属性而不是 length(array) 或 high(array)：
+     // 事实上 length(array) 将存储保留的内存大小，而不是项目计数
+     // - 如果设置了aCountPointer，则其内容将设置为0，无论什么
+     // 数组长度为，或者当前aCountPointer^值为
+     // - 示例用法可能是：
+    // !var
+    // !  DA: TDynArray;
+    // !  A: TIntegerDynArray;
+    // !begin
+    // !  DA.Init(TypeInfo(TIntegerDynArray), A);
+    // ! (...)
+     // - 示例用法可能是（使用计数变量）：
+    // !var
+    // !  DA: TDynArray;
+    // !  A: TIntegerDynArray;
+    // !  ACount: integer;
+    // !  i: integer;
+    // !begin
+    // !  DA.Init(TypeInfo(TIntegerDynArray), A, @ACount);
+    // !  for i := 1 to 100000 do
+    // !    DA.Add(i); // MUCH faster using the ACount variable
+    // ! (...)   // now you should use DA.Count or Count instead of length(A)
     procedure Init(aTypeInfo: PRttiInfo; var aValue; aCountPointer: PInteger = nil);
     /// initialize the wrapper with a one-dimension dynamic array
     // - also set the Compare() function from a supplied TRttiParserType
@@ -1299,41 +1849,68 @@ type
     // ensure that the aKind parameter matches at least the first field of
     // the dynamic array item definition
     // - aCaseInsensitive will be used for ptStringTypes
+    /// 使用一维动态数组初始化包装器
+     // - 还从提供的 TRttiParserType 设置 Compare() 函数
+     // - aKind=ptNone 将从 Info.ArrayRtti/ArrayFirstField 猜测类型
+     // - 如果没有足够的 RTTI 可用，将引发异常
+     // - 不对相应的数组布局进行 RTTI 检查：您应确保 aKind 参数至少与动态数组项定义的第一个字段匹配
+     // - aCaseInsensitive 将用于 ptStringTypes
     function InitSpecific(aTypeInfo: PRttiInfo; var aValue; aKind: TRttiParserType;
       aCountPointer: PInteger = nil; aCaseInsensitive: boolean = false): TRttiParserType;
     /// set a specific TRttiParserType for this dynamic array
     // - could be called after InitRtti() to set the Compare() function
     // - as used by InitSpecific() after InitRtti(Rtti.RegisterType(aTypeInfo))
+    /// 为此动态数组设置特定的 TRttiParserType
+     // - 可以在 InitRtti() 之后调用来设置 Compare() 函数
+     // - 由 InitSpecific() 在 InitRtti(Rtti.RegisterType(aTypeInfo)) 之后使用
     function SetParserType(aKind: TRttiParserType; aCaseInsensitive: boolean): TRttiParserType;
     /// initialize the wrapper with a one-dimension dynamic array
     // - low-level method, as called by Init() and InitSpecific()
     // - can be called directly for a very fast TDynArray initialization
     // - warning: caller should check that aInfo.Kind=rkDynArray
+    /// 使用一维动态数组初始化包装器
+     // - 低级方法，由 Init() 和 InitSpecific() 调用
+     // - 可以直接调用以进行非常快速的 TDynArray 初始化
+     // - 警告：调用者应检查 aInfo.Kind=rkDynArray
     procedure InitRtti(aInfo: TRttiCustom; var aValue; aCountPointer: PInteger); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize the wrapper with a one-dimension dynamic array
     // - low-level method, as called by Init() and InitSpecific()
     // - can be called directly for a very fast TDynArray initialization
     // - warning: caller should check that aInfo.Kind=rkDynArray
+    /// 使用一维动态数组初始化包装器
+     // - 低级方法，由 Init() 和 InitSpecific() 调用
+     // - 可以直接调用以进行非常快速的 TDynArray 初始化
+     // - 警告：调用者应检查 aInfo.Kind=rkDynArray
     procedure InitRtti(aInfo: TRttiCustom; var aValue); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// fast initialize a wrapper for an existing dynamic array of the same type
     // - is slightly faster than
     // ! InitRtti(aAnother.Info, aValue, nil);
+    /// 快速初始化相同类型的现有动态数组的包装器
+     // - 略快于
+     // ! InitRtti(aAnother.Info, aValue, nil);
     procedure InitFrom(aAnother: PDynArray; var aValue);
       {$ifdef HASINLINE}inline;{$endif}
     /// define the reference to an external count integer variable
     // - Init and InitSpecific methods will reset the aCountPointer to 0: you
     // can use this method to set the external count variable without overriding
     // the current value
+    /// 定义对外部计数整型变量的引用
+     // - Init 和 InitSpecific 方法会将 aCountPointer 重置为 0：您可以使用此方法设置外部计数变量而不覆盖当前值
     procedure UseExternalCount(aCountPointer: PInteger);
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize the wrapper to point to no dynamic array
     // - it won't clear the wrapped array, just reset the fValue internal pointer
     // - in practice, will disable the other methods
+    /// 初始化包装器以指向非动态数组
+     // - 它不会清除包装数组，只是重置 fValue 内部指针
+     // - 在实践中，将禁用其他方法
     procedure Void;
     /// check if the wrapper points to a dynamic array
     // - i.e. if Void has been called before
+    /// 检查包装器是否指向动态数组
+     // - 即如果之前已经调用过 Void
     function IsVoid: boolean;
     /// add an element to the dynamic array
     // - warning: Item must be of the same exact type than the dynamic array,
@@ -1342,6 +1919,10 @@ type
     // - note that because of dynamic array internal memory managment, adding
     // may reallocate the list every time a record is added, unless an external
     // count variable has been specified in Init(...,@Count) method
+    /// 添加一个元素到动态数组
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，不能编写 Add(i+10)）
+     // - 返回动态数组中添加元素的索引
+     // - 请注意，由于动态数组内部内存管理，每次添加记录时添加都可能会重新分配列表，除非在 Init(...,@Count) 方法中指定了外部计数变量
     function Add(const Item): PtrInt;
     /// add an element to the dynamic array, returning its index
     // - note: if you use this method to add a new item with a reference to the
@@ -1355,25 +1936,52 @@ type
     // !    with Values[i] do // otherwise Values is nil -> GPF
     // !    begin
     // - or even better, don't use the dubious "with Values[...] do" but NewPtr
+    /// 添加一个元素到动态数组，返回其索引
+     // - 注意：如果您使用此方法添加一个引用的新项目
+     // 动态数组，请注意以下内容会在 FPC 上触发 GPF：
+    // !    with Values[DynArray.New] do // otherwise Values is nil -> GPF
+    // !    begin
+    // !      Field1 := 1;
+    // !      ...
+     // - 所以你应该使用局部变量：
+    // !    i := DynArray.New;
+    // !    with Values[i] do // otherwise Values is nil -> GPF
+    // !    begin
+     // - 或者更好的是，不要使用可疑的“with Values[...] do”，而是使用 NewPtr
     function New: PtrInt;
     /// add an element to the dynamic array, returning its pointer
     // - a slightly faster alternative to ItemPtr(New)
+    /// 添加一个元素到动态数组，返回它的指针
+     // - ItemPtr(New) 的稍微快一点的替代方案
     function NewPtr: pointer;
     /// add an element to the dynamic array at the position specified by Index
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Insert(10,i+10) e.g.)
+    /// 将一个元素添加到动态数组中Index指定的位置
+     // - 警告：项目的类型必须与动态数组的类型完全相同，
+     // 并且必须是对变量的引用（例如不能编写 Insert(10,i+10)）
     procedure Insert(Index: PtrInt; const Item);
     /// get and remove the last element stored in the dynamic array
     // - Add + Pop/Peek will implement a LIFO (Last-In-First-Out) stack
     // - warning: Dest must be of the same exact type than the dynamic array
     // - returns true if the item was successfully copied and removed
     // - use Peek() if you don't want to remove the item, but just get its value
+    /// 获取并删除动态数组中存储的最后一个元素
+     // - Add + Pop/Peek 将实现 LIFO（后进先出）堆栈
+     // - 警告：Dest 的类型必须与动态数组的类型完全相同
+     // - 如果该项目已成功复制并删除，则返回 true
+     // - 如果您不想删除该项目，而只想获取其值，请使用 Peek()
     function Pop(var Dest): boolean;
     /// get the last element stored in the dynamic array
     // - Add + Pop/Peek will implement a LIFO (Last-In-First-Out) stack
     // - warning: Dest must be of the same exact type than the dynamic array
     // - returns true if the item was successfully copied into Dest
     // - use Pop() if you also want to remove the item
+    /// 获取动态数组中存储的最后一个元素
+     // - Add + Pop/Peek 将实现 LIFO（后进先出）堆栈
+     // - 警告：Dest 的类型必须与动态数组的类型完全相同
+     // - 如果该项目已成功复制到 Dest，则返回 true
+     // - 如果您还想删除该项目，请使用 Pop()
     function Peek(var Dest): boolean;
     /// get and remove the first element stored in the dynamic array
     // - Add + PopHead/PeekHead will implement a FIFO (First-In-First-Out) stack
@@ -1382,15 +1990,29 @@ type
     // - returns true if the item was successfully copied and removed
     // - use PeekHead() if you don't want to remove the item, but get its value
     // - first slot will be deleted and all content moved, so may take some time
+    /// 获取并删除动态数组中存储的第一个元素
+     // - Add + PopHead/PeekHead 将实现 FIFO（先进先出）堆栈
+     // - 从头部删除将移动所有项目，因此 TSynQueue 更快
+     // - 警告：Dest 的类型必须与动态数组的类型完全相同
+     // - 如果该项目已成功复制并删除，则返回 true
+     // - 如果您不想删除该项目，但想获取其值，请使用 PeekHead()
+     // - 第一个槽位将被删除并移动所有内容，因此可能需要一些时间
     function PopHead(var Dest): boolean;
     /// get the first element stored in the dynamic array
     // - Add + PopHead/PeekHead will implement a FIFO (First-In-First-Out) stack
     // - warning: Dest must be of the same exact type than the dynamic array
     // - returns true if the item was successfully copied and removed
     // - use PopHead() if you also want to remove the item
+    /// 获取动态数组中存储的第一个元素
+     // - Add + PopHead/PeekHead 将实现 FIFO（先进先出）堆栈
+     // - 警告：Dest 的类型必须与动态数组的类型完全相同
+     // - 如果该项目已成功复制并删除，则返回 true
+     // - 如果您还想删除该项目，请使用 PopHead()
     function PeekHead(var Dest): boolean;
     /// delete the whole dynamic array content
     // - this method will recognize T*ObjArray types and free all instances
+    /// 删除整个动态数组内容
+     // - 此方法将识别 T*ObjArray 类型并释放所有实例
     procedure Clear;
       {$ifdef HASINLINE}inline;{$endif}
     /// delete the whole dynamic array content, ignoring exceptions
@@ -1398,10 +2020,17 @@ type
     // - you should better not call this method, which will catch and ignore
     // all exceptions - but it may somewhat make sense in a destructor
     // - this method will recognize T*ObjArray types and free all instances
+    /// 删除整个动态数组内容，忽略异常
+     // - 如果调用 Clear 时没有发生异常则返回 true，否则返回 false
+     // - 你最好不要调用这个方法，它将捕获并忽略所有异常 - 但它在析构函数中可能有点有意义
+     // - 此方法将识别 T*ObjArray 类型并释放所有实例
     function ClearSafe: boolean;
     /// delete one item inside the dynamic array
     // - the deleted element is finalized if necessary
     // - this method will recognize T*ObjArray types and free all instances
+    /// 删除动态数组中的一项
+     // - 如有必要，删除的元素将被最终确定
+     // - 此方法将识别 T*ObjArray 类型并释放所有实例
     function Delete(aIndex: PtrInt): boolean;
     /// search for an element inside the dynamic array using RTTI
     // - return the index found (0..Count-1), or -1 if Item was not found
@@ -1420,6 +2049,13 @@ type
     // there is no way with standard RTTI to identify randomness from values
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write IndexOf(i+10) e.g.)
+    /// 使用 RTTI 在动态数组中搜索元素
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 将搜索 Item 的所有属性内容：TList.IndexOf() 按地址搜索，此方法使用 RTTI 元素描述（而不是 Compare 属性函数）按内容搜索
+     // - 如果您想通过 Compare 属性函数进行搜索，请使用 Find() 方法，或者例如 仅搜索元素内容的某些部分
+     // - 将使用简单类型：二进制（字节、字、整数、Int64、货币、字节数组[0..255]、内部没有引用计数类型的打包记录...）、字符串类型（例如数组 字符串），以及包含二进制和字符串类型的打包记录（如 TFileVersion）
+     // - 不适用于未打包的类型（例如短字符串，或带有 {$A+} 的字节或字字段的记录）：在这种情况下，可以填充填充数据（即对齐字段之间的字节） 为随机的，并且标准 RTTI 无法从值中识别随机性
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，不能编写 IndexOf(i+10)）
     function IndexOf(const Item; CaseInSensitive: boolean = true): PtrInt;
     /// search for an element inside the dynamic array using the Compare function
     // - this method will use the Compare property function, or the supplied
@@ -1430,6 +2066,12 @@ type
     // - if the array is not sorted, it will use slower O(n) iterating search
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Find(i+10) e.g.)
+    /// 使用 Compare 函数在动态数组中搜索元素
+     // - 此方法将使用 Compare 属性函数，或提供的 aCompare 进行搜索； 如果没有设置，它将回退到 IndexOf() 来执行默认的区分大小写的 RTTI 搜索
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 如果数组已排序，它将使用快速 O(log(n)) 二分搜索
+     // - 如果数组未排序，它将使用较慢的 O(n) 迭代搜索
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 Find(i+10)）
     function Find(const Item; aCompare: TDynArraySortCompare = nil): PtrInt; overload;
     /// search for an element value inside the dynamic array, from an external
     // aIndex[] lookup table - e.g. created by CreateOrderedIndex()
@@ -1440,6 +2082,11 @@ type
     // using aCompare - it won't fallback to IndexOf() RTTI search
     // - warning: the lookup aIndex[] should be synchronized if array content
     // is modified (in case of addition or deletion)
+    /// 从外部 aIndex[] 查找表中搜索动态数组内的元素值 - 例如 由 CreateOrderedIndex() 创建
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 如果提供了索引查找，则它必须已经排序：然后该函数将在 aCompare 上使用快速 O(log(n)) 二分搜索
+     // - 如果索引查找不正确（例如 aIndex=nil），则使用 aCompare 迭代 O(n) - 它不会回退到 IndexOf() RTTI 搜索
+     // - 警告：如果数组内容被修改（添加或删除的情况下），则应同步查找 aIndex[]
     function Find(const Item; const aIndex: TIntegerDynArray;
       aCompare: TDynArraySortCompare): PtrInt; overload;
     /// search for an element value, then fill all properties if match
@@ -1455,6 +2102,14 @@ type
     // - if the array is not sorted, it will use slower O(n) iterating search
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Find(i+10) e.g.)
+    /// 搜索一个元素值，如果匹配则填充所有属性
+     // - 此方法将使用 Compare 属性函数进行搜索，或者使用提供的索引查找表及其关联的比较函数，如果未定义，则回退到区分大小写的 RTTI 搜索
+     // - 如果项目内容匹配，则所有项目字段都将填充该记录
+     // - 可以使用，例如 作为一个简单的字典：如果比较会匹配，例如 第一个字符串字段（即设置为 SortDynArrayString），您可以用搜索到的值填充第一个字符串字段（如果返回的索引 >= 0）
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 如果数组已排序，它将使用快速 O(log(n)) 二分搜索
+     // - 如果数组未排序，它将使用较慢的 O(n) 迭代搜索
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 Find(i+10)）
     function FindAndFill(var Item; aIndex: PIntegerDynArray = nil;
       aCompare: TDynArraySortCompare = nil): integer;
     /// search for an element value, then delete it if match
@@ -1470,6 +2125,14 @@ type
     // - if the array is not sorted, it will use slower O(n) iterating search
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Find(i+10) e.g.)
+    /// 搜索元素值，如果匹配则删除
+     // - 此方法将使用 Compare 属性函数进行搜索，或者使用提供的索引查找表及其关联的比较函数，如果未定义，则回退到区分大小写的 RTTI 搜索
+     // - 如果项目内容匹配，则该项目将从数组中删除
+     // - 可以使用，例如 作为一个简单的字典：如果比较会匹配，例如 第一个字符串字段（即设置为 SortDynArrayString），您可以用搜索到的值填充第一个字符串字段（如果返回的索引 >= 0）
+     // - 返回已删除的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 如果数组已排序，它将使用快速 O(log(n)) 二分搜索
+     // - 如果数组未排序，它将使用较慢的 O(n) 迭代搜索
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 Find(i+10)）
     function FindAndDelete(const Item; aIndex: PIntegerDynArray = nil;
       aCompare: TDynArraySortCompare = nil): integer;
     /// search for an element value, then update the item if match
@@ -1485,6 +2148,14 @@ type
     // - if the array is not sorted, it will use slower O(n) iterating search
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Find(i+10) e.g.)
+    /// 搜索元素值，如果匹配则更新该项
+     // - 此方法将使用 Compare 属性函数进行搜索，或者使用提供的索引查找表及其关联的比较函数，如果未定义，则回退到区分大小写的 RTTI 搜索
+     // - 如果项目内容匹配，则该项目将使用提供的值进行更新
+     // - 可以使用，例如 作为一个简单的字典：如果比较会匹配，例如 第一个字符串字段（即设置为 SortDynArrayString），您可以用搜索到的值填充第一个字符串字段（如果返回的索引 >= 0）
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 如果数组已排序，它将使用快速 O(log(n)) 二分搜索
+     // - 如果数组未排序，它将使用较慢的 O(n) 迭代搜索
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 Find(i+10)）
     function FindAndUpdate(const Item; aIndex: PIntegerDynArray = nil;
       aCompare: TDynArraySortCompare = nil): integer;
     /// search for an element value, then add it if none matched
@@ -1501,28 +2172,47 @@ type
     // - if the array is not sorted, it will use slower O(n) iterating search
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write Find(i+10) e.g.)
+    /// 搜索元素值，如果没有匹配则添加它
+     // - 此方法将使用 Compare 属性函数进行搜索，或者使用提供的索引查找表及其关联的比较函数，如果未定义，则回退到区分大小写的 RTTI 搜索
+     // - 如果没有项目内容匹配，则该项目将添加到数组中
+     // - 可以使用，例如 作为一个简单的字典：如果比较会匹配，例如 第一个字符串字段（即设置为 SortDynArrayString），您可以用搜索到的值填充第一个字符串字段（如果返回的索引 >= 0）
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item 并且已成功添加提供的元素，则返回 -1
+     // - 如果数组已排序，它将使用快速 O(log(n)) 二分搜索
+     // - 如果数组未排序，它将使用较慢的 O(n) 迭代搜索
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 Find(i+10)）
     function FindAndAddIfNotExisting(const Item; aIndex: PIntegerDynArray = nil;
       aCompare: TDynArraySortCompare = nil): integer;
     /// sort the dynamic array items, using the Compare property function
     // - it will change the dynamic array content, and exchange all items
     // in order to be sorted in increasing order according to Compare function
+    /// 使用 Compare 属性函数对动态数组项进行排序
+     // - 它将更改动态数组内容，并交换所有项目，以便根据 Compare 函数按升序排序
     procedure Sort(aCompare: TDynArraySortCompare = nil); overload;
     /// sort some dynamic array items, using the Compare property function
     // - this method allows to sort only some part of the items
     // - it will change the dynamic array content, and exchange all items
     // in order to be sorted in increasing order according to Compare function
+    /// 使用 Compare 属性函数对一些动态数组项进行排序
+     // - 此方法允许仅对项目的某些部分进行排序
+     // - 它将更改动态数组内容，并交换所有项目，以便根据 Compare 函数按升序排序
     procedure SortRange(aStart, aStop: integer;
       aCompare: TDynArraySortCompare = nil);
     /// will check all items against aCompare
+    /// 将根据 aCompare 检查所有项目
     function IsSorted(aCompare: TDynArraySortCompare = nil): boolean;
     /// will check all items against aCompare, calling Sort() if needed
     // - faster than plain Sort() if the array is likely to be already sorted
+    /// 将根据 aCompare 检查所有项目，如果需要则调用 Sort()
+     // - 如果数组可能已经排序，则比普通 Sort() 更快
     procedure EnsureSorted(aCompare: TDynArraySortCompare = nil);
     /// sort the dynamic array items, using a Compare method (not function)
     // - it will change the dynamic array content, and exchange all items
     // in order to be sorted in increasing order according to Compare function,
     // unless aReverse is true
     // - it won't mark the array as Sorted, since the comparer is local
+    /// 使用 Compare 方法（不是函数）对动态数组项进行排序
+     // - 它将更改动态数组内容，并交换所有项目以便根据 Compare 函数按升序排序，除非 aReverse 为 true
+     // - 它不会将数组标记为已排序，因为比较器是本地的
     procedure Sort(const aCompare: TOnDynArraySortCompare;
       aReverse: boolean = false); overload;
     /// search the items range which match a given value in a sorted dynamic array
@@ -1530,6 +2220,11 @@ type
     // - returns TRUE and the matching indexes, or FALSE if none found
     // - if the array is not sorted, returns FALSE
     // - warning: FirstIndex/LastIndex parameters should be integer, not PtrInt
+    /// 在排序的动态数组中搜索与给定值匹配的项目范围
+     // - 此方法将使用 Compare 属性函数进行搜索
+     // - 返回 TRUE 和匹配的索引，如果没有找到则返回 FALSE
+     // - 如果数组未排序，则返回 FALSE
+     // - 警告：FirstIndex/LastIndex 参数应该是整数，而不是 PtrInt
     function FindAllSorted(const Item;
       out FirstIndex, LastIndex: integer): boolean; overload;
     /// search the item pointers which match a given value in a sorted dynamic array
@@ -1537,6 +2232,11 @@ type
     // - return nil and FindCount = 0 if no matching item was found
     // - return the a pointer to the first matching item, and FindCount >=1
     // - warning: FindCount out parameter should be integer, not PtrInt
+    /// 在排序的动态数组中搜索与给定值匹配的项指针
+     // - 此方法将使用 Compare 属性函数进行搜索
+     // - 如果未找到匹配项，则返回 nil 且 FindCount = 0
+     // - 返回指向第一个匹配项的指针，并且 FindCount >=1
+     // - 警告：FindCount 输出参数应该是整数，而不是 PtrInt
     function FindAllSorted(const Item; out FindCount: integer): pointer; overload;
     /// search for an element value inside a sorted dynamic array
     // - this method will use the Compare property function for the search
@@ -1548,10 +2248,21 @@ type
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (no FastLocateSorted(i+10) e.g.)
     // - warning: Index out parameter should be integer, not PtrInt
+    /// 在已排序的动态数组中搜索元素值
+     // - 此方法将使用 Compare 属性函数进行搜索
+     // - 比手动 FindAndAddIfNotExisting+Sort 过程更快
+     // - 返回 TRUE 和现有 Item 的索引，或返回 FALSE 和要插入 Item 的索引，以便数组保持排序状态
+     // - 您应该稍后使用返回的索引调用 FastAddSorted()
+     // - 如果数组未排序，则返回 FALSE 且 Index=-1
+     // - 警告：项目的类型必须与动态数组完全相同，并且必须是对变量的引用（例如，没有 FastLocateSorted(i+10)）
+     // - 警告：索引输出参数应该是整数，而不是 PtrInt
     function FastLocateSorted(const Item; out Index: integer): boolean;
     /// insert a sorted element value at the proper place
     // - the index should have been computed by FastLocateSorted(): false
     // - you may consider using FastLocateOrAddSorted() instead
+    /// 在适当的位置插入已排序的元素值
+     // - 索引应该由 FastLocateSorted() 计算： false
+     // - 您可以考虑使用 FastLocateOrAddSorted() 代替
     procedure FastAddSorted(Index: PtrInt; const Item);
     /// search and add an element value inside a sorted dynamic array
     // - this method will use the Compare property function for the search
@@ -1560,15 +2271,27 @@ type
     // - returns the sorted index of the inserted Item and wasAdded^=true
     // - if the array is not sorted, returns -1 and wasAdded^=false
     // - is just a wrapper around FastLocateSorted+FastAddSorted
+    /// 在已排序的动态数组中搜索并添加元素值
+     // - 此方法将使用 Compare 属性函数进行搜索
+     // - 比手动 FindAndAddIfNotExisting+Sort 过程更快
+     // - 返回现有 Item 的索引并且 wasAdded^=false
+     // - 返回插入的 Item 的排序索引并且 wasAdded^=true
+     // - 如果数组未排序，则返回 -1 且 wasAdded^=false
+     // - 只是 FastLocateSorted+FastAddSorted 的包装
     function FastLocateOrAddSorted(const Item; wasAdded: PBoolean = nil): integer;
     /// delete a sorted element value at the proper place
     // - plain Delete(Index) would reset the fSorted flag to FALSE, so use
     // this method with a FastLocateSorted/FastAddSorted array
+    /// 在适当的位置删除已排序的元素值
+     // - 普通的Delete(Index)会将fSorted标志重置为FALSE，因此将此方法与FastLocateSorted/FastAddSorted数组一起使用
     procedure FastDeleteSorted(Index: PtrInt);
     /// will reverse all array items, in place
+    /// 将原地反转所有数组项
     procedure Reverse;
     /// will call FillZero() on all items, mainly binaries and strings
     // - could be used on a dynamic array to avoid memory forensic after release
+    /// 将在所有项目上调用 FillZero()，主要是二进制文件和字符串
+     // - 可用于动态数组以避免释放后内存取证
     procedure FillZero;
     /// sort the dynamic array items using a lookup array of indexes
     // - in comparison to the Sort method, this CreateOrderedIndex won't change
@@ -1579,16 +2302,26 @@ type
     // a table with one to one lookup (e.g. created with FillIncreasing)
     // - if the lookup table has less items than the main dynamic array,
     // its content will be recreated
+    /// 使用索引查找数组对动态数组项进行排序
+     // - 与 Sort 方法相比，此 CreateOrderedIndex 不会更改动态数组内容，而只会使用指定的比较函数创建（或更新）提供的整数查找数组
+     // - 如果未提供 aCompare，该方法将使用 fCompare（如果已定义）
+     // - 您应该提供一个 void 或一个有效的查找表，即具有一对一查找的表（例如使用 FillIncreasing 创建）
+     // - 如果查找表的项目少于主动态数组，则将重新创建其内容
     procedure CreateOrderedIndex(var aIndex: TIntegerDynArray;
       aCompare: TDynArraySortCompare); overload;
     /// sort the dynamic array items using a lookup array of indexes
     // - this overloaded method will use the supplied TSynTempBuffer for
     // index storage, so use PIntegerArray(aIndex.buf) to access the values
     // - caller should always make aIndex.Done once done
+    /// 使用索引查找数组对动态数组项进行排序
+     // - 此重载方法将使用提供的 TSynTempBuffer 进行索引存储，因此使用 PIntegerArray(aIndex.buf) 来访问值
+     // - 调用者应始终在完成后创建 aIndex.Done
     procedure CreateOrderedIndex(out aIndex: TSynTempBuffer;
       aCompare: TDynArraySortCompare); overload;
     /// sort using a lookup array of indexes, after a Add()
     // - will resize aIndex if necessary, and set aIndex[Count-1] := Count-1
+    /// 在 Add() 之后使用索引查找数组进行排序
+     // - 如有必要，将调整 aIndex 的大小，并设置 aIndex[Count-1] := Count-1
     procedure CreateOrderedIndexAfterAdd(var aIndex: TIntegerDynArray;
       aCompare: TDynArraySortCompare);
     /// save the dynamic array content into a (memory) stream
@@ -1600,6 +2333,11 @@ type
     // use SaveToTypeInfoHash if you share this binary data accross executables
     // - Stream position will be set just after the added data
     // - is optimized for memory streams, but will work with any kind of TStream
+    /// 将动态数组内容保存到（内存）流中
+     // - 将处理二进制值数组（字节、字、整数...）、字符串数组或打包记录数组，具有二进制和字符串属性
+     // - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，任何先前序列化的内容都将失败，可能会触发意外的 GPF：如果共享此二进制文件，请使用 SaveToTypeInfoHash 跨可执行文件的数据
+     // - 流位置将在添加数据之后设置
+     // - 针对内存流进行了优化，但适用于任何类型的 TStream
     procedure SaveToStream(Stream: TStream);
     /// load the dynamic array content from a (memory) stream
     // - stream content must have been created using SaveToStream method
@@ -1609,6 +2347,10 @@ type
     // of the string length - note that if you change the type definition, any
     // previously-serialized content will fail, maybe triggering unexpected GPF:
     // use SaveToTypeInfoHash if you share this binary data accross executables
+    /// 从（内存）流加载动态数组内容
+     // - 流内容必须已使用 SaveToStream 方法创建
+     // - 将处理二进制值数组（字节、字、整数...）、字符串数组或打包记录数组，具有二进制和字符串属性
+     // - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，任何先前序列化的内容都将失败，可能会触发意外的 GPF：如果共享此二进制文件，请使用 SaveToTypeInfoHash 跨可执行文件的数据
     procedure LoadFromStream(Stream: TCustomMemoryStream);
     /// save the dynamic array content using our binary serialization
     // - will use a proprietary binary format, with some variable-length encoding
@@ -1618,6 +2360,11 @@ type
     // - use TDynArray.LoadFrom to decode the saved buffer
     // - warning: legacy Hash32 checksum will be stored as 0, so may be refused
     // by mORMot TDynArray.LoadFrom before 1.18.5966
+    /// 使用我们的二进制序列化保存动态数组内容
+     // - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，任何先前序列化的内容都将失败，可能会触发意外的 GPF
+     // - 此方法将为 T*ObjArray 类型引发 ESynException
+     // - 使用 TDynArray.LoadFrom 解码保存的缓冲区
+     // - 警告：旧版 Hash32 校验和将存储为 0，因此在 1.18.5966 之前可能会被 mORMot TDynArray.LoadFrom 拒绝
     procedure SaveTo(W: TBufferWriter); overload;
     /// save the dynamic array content into a RawByteString
     // - will use a proprietary binary format, with some variable-length encoding
@@ -1628,12 +2375,21 @@ type
     // - use TDynArray.LoadFrom to decode the saved buffer
     // - warning: legacy Hash32 checksum will be stored as 0, so may be refused
     // by mORMot TDynArray.LoadFrom before 1.18.5966
+    /// 将动态数组内容保存到RawByteString中
+     // - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码 - 请注意，如果更改类型定义，任何先前序列化的内容都将失败，可能会触发意外的 GPF：如果共享此二进制文件，请使用 SaveToTypeInfoHash 跨可执行文件的数据
+     // - 此方法将为 T*ObjArray 类型引发 ESynException
+     // - 使用 TDynArray.LoadFrom 解码保存的缓冲区
+     // - 警告：旧版 Hash32 校验和将存储为 0，因此在 1.18.5966 之前可能会被 mORMot TDynArray.LoadFrom 拒绝
     function SaveTo: RawByteString; overload;
     /// unserialize dynamic array content from binary written by TDynArray.SaveTo
     // - return nil if the Source buffer is incorrect: invalid type, wrong
     // checksum, or SourceMax overflow
     // - return a non nil pointer just after the Source content on success
     // - this method will raise an ESynException for T*ObjArray types
+    /// 从 TDynArray.SaveTo 写入的二进制文件中反序列化动态数组内容
+     // - 如果 Source 缓冲区不正确，则返回 nil：类型无效、校验和错误或 SourceMax 溢出
+     // - 成功时在源内容后面返回一个非零指针
+     // - 此方法将为 T*ObjArray 类型引发 ESynException
     function LoadFrom(Source: PAnsiChar;
       {$ifdef PUREMORMOT2} // SourceMax is manadatory for safety
       SourceMax: PAnsiChar): PAnsiChar;
@@ -1641,29 +2397,41 @@ type
       SourceMax: PAnsiChar = nil): PAnsiChar;
       {$endif PUREMORMOT2}
     /// unserialize dynamic array content from binary written by TDynArray.SaveTo
+    /// 从 TDynArray.SaveTo 写入的二进制文件中反序列化动态数组内容
     procedure LoadFromReader(var Read: TFastReader);
     /// unserialize the dynamic array content from a TDynArray.SaveTo binary string
     // - same as LoadFrom, and will check for any buffer overflow since we
     // know the actual end of input buffer
     // - will read mORMot 1.18 binary content, but will ignore the Hash32
     // stored checksum which is not needed any more
+    /// 从 TDynArray.SaveTo 二进制字符串反序列化动态数组内容
+     // - 与 LoadFrom 相同，并且将检查任何缓冲区溢出，因为我们知道输入缓冲区的实际末尾
+     // - 将读取 mORMot 1.18 二进制内容，但将忽略不再需要的 Hash32 存储的校验和
     function LoadFromBinary(const Buffer: RawByteString): boolean;
     /// serialize the dynamic array content as JSON
+    /// 将动态数组内容序列化为JSON
     function SaveToJson(EnumSetsAsText: boolean = false;
       reformat: TTextWriterJsonFormat = jsonCompact): RawUtf8; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// serialize the dynamic array content as JSON
+    /// 将动态数组内容序列化为JSON
     procedure SaveToJson(out result: RawUtf8; EnumSetsAsText: boolean = false;
       reformat: TTextWriterJsonFormat = jsonCompact); overload;
     /// serialize the dynamic array content as JSON
     // - is just a wrapper around TTextWriter.AddTypedJson()
     // - this method will therefore recognize T*ObjArray types
+    /// 将动态数组内容序列化为JSON
+     // - 只是 TTextWriter.AddTypedJson() 的包装
+     // - 因此该方法将识别 T*ObjArray 类型
     procedure SaveToJson(out result: RawUtf8; Options: TTextWriterOptions;
       ObjectOptions: TTextWriterWriteObjectOptions = [];
       reformat: TTextWriterJsonFormat = jsonCompact); overload;
     /// serialize the dynamic array content as JSON
     // - is just a wrapper around TTextDateWTTextWriterriter.AddTypedJson()
     // - this method will therefore recognize T*ObjArray types
+    /// 将动态数组内容序列化为JSON
+     // - 只是 TTextDateWTTextWriterriter.AddTypedJson() 的包装
+     // - 因此该方法将识别 T*ObjArray 类型
     procedure SaveToJson(W: TTextWriter;
       ObjectOptions: TTextWriterWriteObjectOptions = []); overload;
     /// load the dynamic array content from an UTF-8 encoded JSON buffer
@@ -11456,4 +12224,5 @@ initialization
   InitializeUnit;
 
 end.
+
 
