@@ -1,6 +1,9 @@
+
 /// Framework Core Low-Level Variants / TDocVariant process
 // - this unit is a part of the Open Source Synopse mORMot framework 2,
 // licensed under a MPL/GPL/LGPL three license - see LICENSE.md
+/// 框架核心低级变体/TDocVariant 流程
+// - 本单元是开源 Synopse mORMot 框架 2 的一部分，根据 MPL/GPL/LGPL 三个许可证获得许可 - 请参阅 LICENSE.md
 unit mormot.core.variants;
 
 {
@@ -12,6 +15,13 @@ unit mormot.core.variants;
   - TDocVariant Object/Array Document Holder with JSON support
   - JSON Parsing into Variant
   - Variant Binary Serialization
+
+所有框架单元共享的 Variant / TDocVariant 功能
+   - 低级变体包装器
+   - 支持 JSON 的自定义变体类型
+   - 支持 JSON 的 TDocVariant 对象/数组文档持有者
+   - JSON 解析为变体
+   - 变体二进制序列化
 
   *****************************************************************************
 }
@@ -28,16 +38,18 @@ uses
   mormot.core.os,
   mormot.core.unicode,
   mormot.core.text,
-  mormot.core.data, // already included in mormot.core.json
+  mormot.core.data, // already included in mormot.core.json  (已经包含在 mormot.core.json 中)
   mormot.core.buffers,
   mormot.core.rtti,
   mormot.core.json;
 
   
 { ************** Low-Level Variant Wrappers }
+{ ************** 低级变体包装器 }
 
 type
   /// exception class raised by this unit during raw Variant process
+  /// 在原始 Variant 过程中该单元引发的异常类
   ESynVariant = class(ESynException);
 
 const
@@ -52,16 +64,24 @@ const
 // - varBoolean=false or varDate=0 would be considered as void
 // - a TDocVariantData with Count=0 would be considered as void
 // - any other value (e.g. floats or integer) would be considered as not void
+/// 快速检查变量是否包含值
+// - varEmpty、varNull 或 '' 字符串将被视为 void
+// - varBoolean=false 或 varDate=0 将被视为 void
+// - Count=0 的 TDocVariantData 将被视为 void
+// - 任何其他值（例如浮点数或整数）将被视为非 void
 function VarIsVoid(const V: Variant): boolean;
 
 /// returns a supplied string as variant, or null if v is void ('')
+/// 返回提供的字符串作为变体，如果 v 为 void ('')，则返回 null
 function VarStringOrNull(const v: RawUtf8): variant;
 
 type
   /// a set of simple TVarData.VType, as specified to VarIs()
+  /// 一组简单的 TVarData.VType，如 VarIs() 所指定
   TVarDataTypes = set of 0..255;
 
 /// allow to check for a specific set of TVarData.VType
+/// 允许检查一组特定的 TVarData.VType
 function VarIs(const V: Variant; const VTypes: TVarDataTypes): boolean;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -72,28 +92,46 @@ function VarIs(const V: Variant; const VTypes: TVarDataTypes): boolean;
 // ! V := _Json('{arr:[1,2]}');
 // ! V.arr.Add(3);   // will work, since V.arr will be returned by reference
 // ! writeln(V);     // will write '{"arr":[1,2,3]}'
+/// 与 Dest := Source 相同，但通过引用复制
+// - 即 VType 定义为 varVariant 或 varByRef / varVariantByRef
+// - 例如，它将用于 TDocVariant 属性的后期绑定，以使以下语句按预期工作：
+// ! V := _Json('{arr:[1,2]}');
+// ! V.arr.Add(3);   // will work, since V.arr will be returned by reference
+// ! writeln(V);     // will write '{"arr":[1,2,3]}'
 procedure SetVariantByRef(const Source: Variant; var Dest: Variant);
 
 /// same as Dest := Source, but copying by value
 // - will unreference any varByRef content
 // - will convert any string value into RawUtf8 (varString) for consistency
+/// 与 Dest := Source 相同，但按值复制
+// - 将取消引用任何 varByRef 内容
+// - 将任何字符串值转换为 RawUtf8 (varString) 以保持一致性
 procedure SetVariantByValue(const Source: Variant; var Dest: Variant);
 
 /// same as FillChar(Value^,SizeOf(TVarData),0)
 // - so can be used for TVarData or Variant
 // - it will set V.VType := varEmpty, so Value will be Unassigned
 // - it won't call VarClear(variant(Value)): it should have been cleaned before
+/// 与 FillChar(Value^,SizeOf(TVarData),0) 相同
+// - 所以可用于 TVarData 或 Variant
+// - 它将设置 V.VType := varEmpty，因此 Value 将被取消分配
+// - 它不会调用 VarClear(variant(Value))：它之前应该已经被清理过
 procedure ZeroFill(Value: PVarData);
   {$ifdef HASINLINE}inline;{$endif}
 
 /// fill all bytes of the value's memory buffer with zeros, i.e. 'toto' -> #0#0#0#0
 // - may be used to cleanup stack-allocated content
+/// 用零填充值内存缓冲区的所有字节，即 'toto' -> #0#0#0#0
+// - 可用于清理堆栈分配的内容
 procedure FillZero(var value: variant); overload;
 
 /// convert an UTF-8 encoded text buffer into a variant RawUtf8 varString
 // - this overloaded version expects a destination variant type (e.g. varString
 // varOleStr / varUString) - if the type is not handled, will raise an
 // EVariantTypeCastError
+/// 将 UTF-8 编码的文本缓冲区转换为变体 RawUtf8 varString
+// - 此重载版本需要目标变体类型（例如 varString varOleStr / varUString）
+// - 如果未处理该类型，将引发 EVariantTypeCastError
 procedure RawUtf8ToVariant(const Txt: RawUtf8; var Value: TVarData;
   ExpectedValueType: cardinal); overload;
 
@@ -101,31 +139,45 @@ procedure RawUtf8ToVariant(const Txt: RawUtf8; var Value: TVarData;
 // - note that, due to a Delphi compiler limitation, cardinal values should be
 // type-casted to Int64() (otherwise the integer mapped value will be converted)
 // - vt*String or vtVariant arguments are returned as varByRef
+/// 将开放数组（const Args：const 数组）参数转换为变体
+// - 请注意，由于 Delphi 编译器的限制，基数值应类型转换为 Int64() （否则整数映射值将被转换）
+// - vt*String 或 vtVariant 参数作为 varByRef 返回
 procedure VarRecToVariant(const V: TVarRec; var result: variant); overload;
 
 /// convert an open array (const Args: array of const) argument to a variant
 // - note that, due to a Delphi compiler limitation, cardinal values should be
 // type-casted to Int64() (otherwise the integer mapped value will be converted)
 // - vt*String or vtVariant arguments are returned as varByRef
+/// 将开放数组（const Args：const 数组）参数转换为变体
+// - 请注意，由于 Delphi 编译器的限制，基数值应类型转换为 Int64() （否则整数映射值将被转换）
+// - vt*String 或 vtVariant 参数作为 varByRef 返回
 function VarRecToVariant(const V: TVarRec): variant; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// convert a variant to an open array (const Args: array of const) argument
 // - variant is accessed by reference as vtVariant so should remain available
+/// 将变量转换为开放数组（const Args：const 数组）参数
+// - 通过引用作为 vtVariant 访问变量，因此应该保持可用
 procedure VariantToVarRec(const V: variant; var result: TVarRec);
   {$ifdef HASINLINE}inline;{$endif}
 
 /// convert a variant array to open array (const Args: array of const) arguments
 // - variants are accessed by reference as vtVariant so should remain available
+/// 将变体数组转换为开放数组（const Args：const 数组）参数
+// - 变体通过引用作为 vtVariant 访问，因此应该保持可用
 procedure VariantsToArrayOfConst(const V: array of variant; VCount: PtrInt;
   out result: TTVarRecDynArray); overload;
 
 /// convert a variant array to open array (const Args: array of const) arguments
 // - variants are accessed by reference as vtVariant so should remain available
+/// 将变体数组转换为开放数组（const Args：const 数组）参数
+// - 变体通过引用作为 vtVariant 访问，因此应该保持可用
 function VariantsToArrayOfConst(const V: array of variant): TTVarRecDynArray; overload;
 
 /// convert an array of RawUtf8 to open array (const Args: array of const) arguments
 // - RawUtf8 are accessed by reference as vtAnsiString so should remain available
+/// 将 RawUtf8 数组转换为开放数组（const Args：const 数组）参数
+// - RawUtf8 通过引用作为 vtAnsiString 进行访问，因此应该保持可用
 function RawUtf8DynArrayToArrayOfConst(const V: array of RawUtf8): TTVarRecDynArray;
 
 /// convert any Variant into a VCL string type
@@ -135,46 +187,69 @@ function RawUtf8DynArrayToArrayOfConst(const V: array of RawUtf8): TTVarRecDynAr
 // generated by our framework units - otherwise, you may loose encoded characters
 // - for Unicode versions of Delphi, there won't be any potential data loss,
 // but this version may be slightly faster than a string(aVariant)
+/// 将任何 Variant 转换为 VCL 字符串类型
+// - 期望任何 varString 值存储为 RawUtf8
+// - 在 Delphi 2009 之前，使用 VariantToString(aVariant) 而不是 string(aVariant) 从我们的框架单元生成的变体中安全地检索 string=AnsiString 值 - 否则，您可能会丢失编码字符
+// - 对于 Delphi 的 Unicode 版本，不会有任何潜在的数据丢失，但此版本可能比字符串（aVariant）稍快
 function VariantToString(const V: Variant): string;
 
 /// convert a dynamic array of variants into its JSON serialization
 // - will use a TDocVariantData temporary storage
+/// 将动态变体数组转换为其 JSON 序列化
+// - 将使用 TDocVariantData 临时存储
 function VariantDynArrayToJson(const V: TVariantDynArray): RawUtf8;
 
 /// convert a dynamic array of variants into its text values
+/// 将动态变量数组转换为其文本值
 function VariantDynArrayToRawUtf8DynArray(const V: TVariantDynArray): TRawUtf8DynArray;
 
 /// convert a JSON array into a dynamic array of variants
 // - will use a TDocVariantData temporary storage
+/// 将 JSON 数组转换为变体的动态数组
+// - 将使用 TDocVariantData 临时存储
 function JsonToVariantDynArray(const Json: RawUtf8): TVariantDynArray;
 
 /// convert an open array list into a dynamic array of variants
 // - will use a TDocVariantData temporary storage
+/// 将开放数组列表转换为变体的动态数组
+// - 将使用 TDocVariantData 临时存储
 function ValuesToVariantDynArray(const items: array of const): TVariantDynArray;
 
 type
   /// function prototype used internally for variant comparison
   // - as used e.g. by TDocVariantData.SortByValue
+  /// 内部用于变量比较的函数原型
+   // - 如所使用的，例如 通过 TDocVariantData.SortByValue
   TVariantCompare = function(const V1, V2: variant): PtrInt;
   /// function prototype used internally for extended variant comparison
   // - as used by TDocVariantData.SortByRow
+  /// 内部用于扩展变体比较的函数原型
+   // - 由 TDocVariantData.SortByRow 使用
   TVariantComparer = function(const V1, V2: variant): PtrInt of object;
   /// function prototype used internally for extended variant comparison
   // - as used by TDocVariantData.SortArrayByFields
+  /// 内部用于扩展变体比较的函数原型
+   // - 由 TDocVariantData.SortArrayByFields 使用
   TVariantCompareField = function(const FieldName: RawUtf8;
     const V1, V2: variant): PtrInt of object;
 
 /// internal function as called by inlined VariantCompare/VariantCompareI and
 // the SortDynArrayVariantComp() function overriden by this unit
+/// 由内联 VariantCompare/VariantCompareI 调用的内部函数和
+// 该单元重写的 SortDynArrayVariantComp() 函数
 function FastVarDataComp(A, B: PVarData; caseInsensitive: boolean): integer;
 
 /// TVariantCompare-compatible case-sensitive comparison function
 // - just a wrapper around FastVarDataComp(caseInsensitive=false)
+/// TVariantCompare 兼容区分大小写的比较函数
+// - 只是 FastVarDataComp(caseInsensitive=false) 的包装
 function VariantCompare(const V1, V2: variant): PtrInt;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// TVariantCompare-compatible case-insensitive comparison function
 // - just a wrapper around FastVarDataComp(caseInsensitive=true)
+/// TVariantCompare 兼容的不区分大小写的比较函数
+// - 只是 FastVarDataComp(caseInsensitive=true) 的包装
 function VariantCompareI(const V1, V2: variant): PtrInt;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -182,14 +257,20 @@ function VariantCompareI(const V1, V2: variant): PtrInt;
 // - slightly faster than plain V=Str, which computes a temporary variant
 // - here Str='' equals unassigned, null or false
 // - if CaseSensitive is false, will use PropNameEquals() for comparison
+/// 快速比较 Variant 和 UTF-8 编码的字符串（或数字）
+// - 比普通 V=Str 稍快，后者计算临时变量
+// - 这里 Str='' 等于未分配、null 或 false
+// - 如果 CaseSensitive 为 false，将使用 PropNameEquals() 进行比较
 function VariantEquals(const V: Variant; const Str: RawUtf8;
   CaseSensitive: boolean = true): boolean; overload;
 
 
 { ************** Custom Variant Types with JSON support }
+{ ************** 支持 JSON 的自定义变体类型 }
 
 type
   /// define how our custom variant types behave, i.e. its methods featureset
+  /// 定义我们的自定义变体类型的行为方式，即其方法功能集
   TSynInvokeableVariantTypeOptions = set of (
     sioHasTryJsonToVariant,
     sioHasToJson,
@@ -203,16 +284,24 @@ type
   // TInvokeableVariantType for properties getter/setter, but you should
   // manually register each type by calling SynRegisterCustomVariantType()
   // - also feature custom JSON parsing, via TryJsonToVariant() protected method
+  /// 自定义变体处理程序，可以更轻松/更快地访问变体属性，并支持 JSON 序列化
+   // - 默认的 GetProperty/SetProperty 方法通过一些受保护的虚拟 IntGet/IntSet 方法调用，开销较小（要重写）
+   // - 这些类型的自定义变体将比属性 getter/setter 的默认 TInvokeableVariantType 更快，但您应该通过调用 SynRegisterCustomVariantType() 手动注册每种类型
+   // - 还具有自定义 JSON 解析功能，通过 TryJsonToVariant() 受保护方法
   TSynInvokeableVariantType = class(TInvokeableVariantType)
   protected
     fOptions: TSynInvokeableVariantTypeOptions;
     {$ifdef ISDELPHI}
     /// our custom call backs do not want the function names to be uppercased
+    /// 我们的自定义回调不希望函数名称大写
     function FixupIdent(const AText: string): string; override;
     {$endif ISDELPHI}
     // intercept for a faster direct IntGet/IntSet calls
     // - note: SetProperty/GetProperty are never called by this class/method
     // - also circumvent FPC 3.2+ inverted parameters order
+    // 拦截更快的直接 IntGet/IntSet 调用
+     // - 注意：此类/方法永远不会调用 SetProperty/GetProperty
+     // - 也规避 FPC 3.2+ 反转参数顺序
     {$ifdef FPC_VARIANTSETVAR}
     procedure DispInvoke(Dest: PVarData; var Source: TVarData;
       CallDesc: PCallDesc; Params: Pointer); override;
@@ -227,15 +316,21 @@ type
     {$endif FPC_VARIANTSETVAR}
   public
     /// virtual constructor which should set the custom type Options
+    /// 虚拟构造函数应设置自定义类型选项
     constructor Create; virtual;
     /// search of a registered custom variant type from its low-level VarType
     // - will first compare with its own VarType for efficiency
     // - returns true and set the matching CustomType if found, false otherwise
+    /// 从其低级 VarType 中搜索已注册的自定义变体类型
+     // - 首先会与自己的 VarType 进行比较以提高效率
+     // - 如果找到则返回 true 并设置匹配的 CustomType，否则返回 false
     function FindSynVariantType(aVarType: cardinal;
       out CustomType: TSynInvokeableVariantType): boolean; overload;
       {$ifdef HASINLINE} inline; {$endif}
     /// search of a registered custom variant type from its low-level VarType
     // - will first compare with its own VarType for efficiency
+    /// 从其低级 VarType 中搜索已注册的自定义变体类型
+     // - 首先会与自己的 VarType 进行比较以提高效率
     function FindSynVariantType(aVarType: cardinal): TSynInvokeableVariantType; overload;
       {$ifdef HASINLINE} inline; {$endif}
     /// customization of JSON parsing into variants
@@ -248,27 +343,45 @@ type
     // - this method could be overridden to identify any custom JSON content
     // and convert it into a dedicated variant instance, then return TRUE
     // - warning: should NOT modify JSON buffer in-place, unless it returns true
+    /// 自定义 JSON 解析为变体
+     // - 仅当设置了 sioHasTryJsonToVariant 选项时才启用
+     // - 将被例如调用 通过 VariantLoadJson() 或 GetVariantFromJsonField() 并使用选项：PDocVariantOptions 参数不为 nil
+     // - 此默认实现将始终返回 FALSE，这意味着提供的 JSON 不会由此自定义（抽象）变体类型处理
+     // - 可以重写此方法以识别任何自定义 JSON 内容并将其转换为专用变体实例，然后返回 TRUE
+     // - 警告：不应就地修改 JSON 缓冲区，除非它返回 true    
     function TryJsonToVariant(var Json: PUtf8Char; var Value: variant;
       EndOfObject: PUtf8Char): boolean; virtual;
     /// customization of variant into JSON serialization
+    /// 自定义变体为JSON序列化
     procedure ToJson(W: TJsonWriter; Value: PVarData); overload; virtual;
     /// save a variant as UTF-8 encoded JSON
     // - implemented as a wrapper around ToJson()
+    /// 将变体保存为 UTF-8 编码的 JSON
+     // - 作为 ToJson() 的包装器实现
     procedure ToJson(Value: PVarData; var Json: RawUtf8;
       const Prefix: RawUtf8 = ''; const Suffix: RawUtf8 = '';
       Format: TTextWriterJsonFormat = jsonCompact); overload; virtual;
     /// clear the content
     // - this default implementation will set VType := varEmpty
     // - override it if your custom type needs to manage its internal memory
+    /// 清除内容
+     // - 此默认实现将设置 VType := varEmpty
+     // - 如果您的自定义类型需要管理其内部内存，则覆盖它
     procedure Clear(var V: TVarData); override;
     /// copy two variant content
     // - this default implementation will copy the TVarData memory
     // - override it if your custom type needs to manage its internal structure
+    /// 复制两个变体内容
+     // - 此默认实现将复制 TVarData 内存
+     // - 如果您的自定义类型需要管理其内部结构，则覆盖它
     procedure Copy(var Dest: TVarData; const Source: TVarData;
       const Indirect: boolean); override;
     /// copy two variant content by value
     // - this default implementation will call the Copy() method
     // - override it if your custom types may use a by reference copy pattern
+    /// 按值复制两个变体内容
+     // - 此默认实现将调用 Copy() 方法
+     // - 如果您的自定义类型可能使用引用复制模式，则覆盖它
     procedure CopyByValue(var Dest: TVarData;
       const Source: TVarData); virtual;
     /// this method will allow to look for dotted name spaces, e.g. 'parent.child'
@@ -276,6 +389,10 @@ type
     // - will identify TDocVariant storage, or resolve and call the generic
     // TSynInvokeableVariantType.IntGet() method until nested value match
     // - you can set e.g. PathDelim = '/' to search e.g. for 'parent/child'
+    /// 此方法将允许查找点名称空间，例如 '父母.孩子'
+     // - 如果 FullName 与任何值都不匹配，则应返回 Unassigned
+     // - 将识别 TDocVariant 存储，或解析并调用通用 TSynInvokeableVariantType.IntGet() 方法，直到嵌套值匹配
+     // - 你可以设置例如 PathDelim = '/' 进行搜索，例如 对于“父母/孩子”
     procedure Lookup(var Dest: TVarData; const Instance: TVarData;
       FullName: PUtf8Char; PathDelim: AnsiChar = '.');
     /// will check if the value is an array, and return the number of items
@@ -284,33 +401,50 @@ type
     // - this default implementation will return -1 (meaning this is not an array)
     // - overridden method could implement it, e.g. for TDocVariant of kind
     // dvArray - or dvObject (ignoring names) if GetObjectAsValues is true
+    /// 将检查该值是否为数组，并返回项目数
+     // - 如果文档是一个数组，将返回项目计数（0 表示无效数组） - 例如使用 通过 TSynMustacheContextVariant
+     // - 这个默认实现将返回-1（意味着这不是一个数组）
+     // - 重写的方法可以实现它，例如 对于 dvArray 类型的 TDocVariant - 或 dvObject（忽略名称）（如果 GetObjectAsValues 为 true）
     function IterateCount(const V: TVarData; GetObjectAsValues: boolean): integer; virtual;
     /// allow to loop over an array document
     // - Index should be in 0..IterateCount-1 range
     // - this default implementation will do nothing
+    /// 允许循环遍历数组文档
+     // - 索引应该在 0..IterateCount-1 范围内
+     // - 这个默认实现不会执行任何操作
     procedure Iterate(var Dest: TVarData; const V: TVarData;
       Index: integer); virtual;
     /// returns TRUE if the supplied variant is of the exact custom type
+    /// 如果提供的变体是精确的自定义类型，则返回 TRUE
     function IsOfType(const V: variant): boolean;
       {$ifdef HASINLINE}inline;{$endif}
     /// returns TRUE if the supplied custom variant is void
     // - e.g. returns true for a TDocVariant or TBsonVariant with Count = 0
     // - caller should have ensured that it is of the exact custom type
+    /// 如果提供的自定义变体为空，则返回 TRUE
+     // - 例如 对于 Count = 0 的 TDocVariant 或 TBsonVariant 返回 true
+     // - 调用者应该确保它是准确的自定义类型
     function IsVoid(const V: TVarData): boolean; virtual;
     /// override this abstract method for actual getter by name implementation
+    /// 通过名称实现重写这个抽象方法以实现实际的 getter
     function IntGet(var Dest: TVarData; const Instance: TVarData;
       Name: PAnsiChar; NameLen: PtrInt; NoException: boolean): boolean; virtual;
     /// override this abstract method for actual setter by name implementation
+    /// 通过名称实现重写此抽象方法以实现实际设置器
     function IntSet(const Instance, Value: TVarData;
       Name: PAnsiChar; NameLen: PtrInt): boolean; virtual;
     /// identify how this custom type behave
     // - as set by the class constructor, to avoid calling any virtual method
+    /// 识别此自定义类型的行为方式
+     // - 由类构造函数设置，以避免调用任何虚拟方法
     property Options: TSynInvokeableVariantTypeOptions
       read fOptions;
   end;
 
   /// class-reference type (metaclass) of custom variant type definition
   // - used by SynRegisterCustomVariantType() function
+  /// 自定义变体类型定义的类引用类型（元类）
+   // - 由 SynRegisterCustomVariantType() 函数使用
   TSynInvokeableVariantTypeClass = class of TSynInvokeableVariantType;
 
 var
@@ -319,6 +453,11 @@ var
   // - SynVariantTypes[1] is e.g. BsonVariantType from mormot.db.nosql.bson
   // - instances are owned by Variants.pas as TInvokeableVariantType instances
   // - is defined here for proper FindSynVariantType inlining
+  /// TSynInvokeableVariantType 实例的内部列表
+   // - SynVariantTypes[0] 始终是 DocVariantVType
+   // - SynVariantTypes[1] 是例如 来自 mormot.db.nosql.bson 的 BsonVariantType
+   // - 实例由 Variants.pas 作为 TInvokeableVariantType 实例拥有
+   // - 此处定义用于正确的 FindSynVariantType 内联
   SynVariantTypes: array of TSynInvokeableVariantType;
 
 /// register a custom variant type to handle properties
@@ -326,21 +465,31 @@ var
 // - this will implement an internal mechanism used to bypass the default
 // _DispInvoke() implementation in Variant.pas, to use a faster version
 // - is called in case of TDocVariant, TBsonVariant or TSqlDBRowVariant
+/// 注册自定义变体类型来处理属性
+// - 注册过程是线程安全的
+// - 这将实现一个用于绕过默认值的内部机制
+// Variant.pas 中的 _DispInvoke() 实现，以使用更快的版本
+// - 在 TDocVariant、TBsonVariant 或 TSqlDBRowVariant 的情况下调用
 function SynRegisterCustomVariantType(
   aClass: TSynInvokeableVariantTypeClass): TSynInvokeableVariantType;
 
 /// search of a registered custom variant type from its low-level VarType
 // - returns the matching custom variant type, nil if not found
+/// 从其低级 VarType 中搜索已注册的自定义变体类型
+// - 返回匹配的自定义变体类型，如果未找到则返回 nil
 function FindSynVariantType(aVarType: cardinal): TSynInvokeableVariantType;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// try to serialize a custom variant value into JSON
 // - as used e.g. by TJsonWriter.AddVariant
+/// 尝试将自定义变量值序列化为 JSON
+// - 如所使用的，例如 通过 TJsonWriter.AddVariant
 function CustomVariantToJson(W: TJsonWriter; Value: PVarData;
   Escape: TTextWriterKind): boolean;
 
 
 { ************** TDocVariant Object/Array Document Holder with JSON support }
+{ ************** TDocVariant 对象/数组文档持有者，支持 JSON }
 
 type
   /// JSON_[] constant convenient TDocVariant options
@@ -368,6 +517,18 @@ type
   // - mNameValueInternExtended will copy-by-reference, check field names
   // case-sensitively, write extended JSON and intern names and values,
   // as defined by JSON_NAMEVALUEINTERN[true] global variable
+  /// JSON_[] 常量方便的 TDocVariant 选项
+   // - mVoid 使用 [] 定义安全（且缓慢）的完整复制行为（无选项）
+   // - mDefault 定义了安全（且缓慢）的完整复制行为，对于未知字段返回 null，如定义的，例如 通过 _Json() 和 _JsonFmt() 函数或 JSON_OPTIONS[false]
+   // - mFast 将按引用复制任何 TDocVariantData 内容，如定义的 通过 _JsonFast() 和 _JsonFastFmt() 函数或 JSON_OPTIONS[true]
+   // - mFastFloat 将按引用复制并可以将浮点解析为双精度
+   // - mFastStrict 将按引用复制并仅解析严格（引用）JSON，如 JSON_FAST_STRICT 全局变量所定义
+   // - mFastExtended 将按引用复制并写入扩展（不带引号）JSON，如 JSON_FAST_EXTENDED 全局变量所定义
+   // - mFastExtendedIntern 将按引用复制，写入扩展 JSON 和实习生名称和值，如 JSON_FAST_EXTENDEDINTERN 变量所定义
+   // - mNameValue 将按引用复制并区分大小写检查字段名称，如 JSON_NAMEVALUE[false] 全局变量所定义
+   // - mNameValueExtended 将按引用复制，区分大小写检查字段名称并写入扩展（不带引号）JSON，如 JSON_NAMEVALUE[true] 全局变量所定义
+   // - mNameValueIntern 将按引用复制，区分大小写检查字段名称以及实习生名称和值，如 JSON_NAMEVALUEINTERN[false] 全局变量所定义
+   // - mNameValueInternExtended 将按引用复制，区分大小写检查字段名称，写入扩展 JSON 和实习生名称和值，如 JSON_NAMEVALUEINTERN[true] 全局变量所定义  
   TDocVariantModel = (
     mVoid,
     mDefault,
@@ -383,6 +544,7 @@ type
 
 var
   /// some convenient TDocVariant options, e.g. as JSON_[fDefault]
+  /// 一些方便的 TDoc Variant 选项，例如 作为 JSON[默认]
   JSON_: array[TDocVariantModel] of TDocVariantOptions = (
     // mVoid
     [],
@@ -438,12 +600,15 @@ const
   /// same as JSON_[mFast], but can not be used as PDocVariantOptions
   // - handle only currency for floating point values: use JSON_FAST_FLOAT
   // if you want to support double values, with potential precision loss
+  /// 与 JSON_[mFast] 相同，但不能用作 PDocVariantOptions
+   // - 仅处理浮点值的货币：如果您想支持双精度值，请使用 JSON_FAST_FLOAT，但可能会导致精度损失
   JSON_FAST =
     [dvoReturnNullForUnknownProperty,
      dvoValueCopiedByReference];
 
   /// same as JSON_FAST, but including dvoAllowDoubleValue for floating
   // point values parsing into double, with potential precision loss
+  /// 与 JSON_FAST 相同，但包括 dvoAllowDoubleValue 用于将浮点值解析为双精度，可能会导致精度损失
   JSON_FAST_FLOAT =
     [dvoReturnNullForUnknownProperty,
      dvoValueCopiedByReference,
@@ -452,6 +617,8 @@ const
 var
   /// TDocVariant options which may be used for plain JSON parsing
   // - this won't recognize any extended syntax
+  /// TDocVariant 选项可用于纯 JSON 解析
+   // - 这不会识别任何扩展语法  
   JSON_FAST_STRICT: TDocVariantOptions;
 
   /// TDocVariant options to be used so that JSON serialization would
@@ -475,6 +642,23 @@ var
   // - consider using JSON_NAMEVALUE[true] for case-sensitive
   // TSynNameValue-like storage, or JSON_FAST_EXTENDEDINTERN if you
   // expect RawUtf8 names and values interning
+  /// 要使用的 TDocVariant 选项，以便 JSON 序列化将使用不带引号的 JSON 语法作为字段名称
+   // - 你可以使用它，例如 通过自定义 TOrmModel 实例，在 TOrm 变体发布字段上减少数据库存储期间的 JSON 转义过程：
+   //！ （aModel.Props[TOrmMyRecord]['VariantProp'] 作为 TOrmPropInfoRttiVariant）。
+   //！ DocVariantOptions := JSON_FAST_EXTENDED;
+   // 或者 - 以更简洁的方式 - 通过重写 TOrm.InternalDefineModel():
+   // ! class procedure TOrmMyRecord.InternalDefineModel(Props: TOrmProperties);
+   // ! begin
+   // !   (Props.Fields.ByName('VariantProp') as TOrmPropInfoRttiVariant).
+   // !     DocVariantOptions := JSON_FAST_EXTENDED;
+   // ! end;
+   // 或者一次设置所有变体字段：
+   // ! class procedure TOrmMyRecord.InternalDefineModel(Props: TOrmProperties);
+   // ! begin
+   // !   Props.SetVariantFieldsDocVariantOptions(JSON_FAST_EXTENDED);
+   // ! end;
+   // - 考虑使用 JSON_NAMEVALUE[true] 区分大小写
+   // 类似 TSynNameValue 的存储，如果您希望使用 RawUtf8 名称和值，则使用 JSON_FAST_EXTENDEDINTERN  
   JSON_FAST_EXTENDED: TDocVariantOptions;
 
   /// TDocVariant options for JSON serialization with efficient storage
@@ -482,26 +666,38 @@ var
   // - may be used e.g. for efficient persistence of similar data
   // - consider using JSON_FAST_EXTENDED if you don't expect
   // RawUtf8 names and values interning, or need BSON variants parsing
+  /// 用于具有高效存储的 JSON 序列化的 TDocVariant 选项
+   // - 即字段名称和 RawUtf8 实习的不带引号的 JSON 语法
+   // - 可以使用，例如 相似数据的有效持久化
+   // - 如果您不希望 RawUtf8 名称和值实习，或者需要 BSON 变体解析，请考虑使用 JSON_FAST_EXTENDED  
   JSON_FAST_EXTENDEDINTERN: TDocVariantOptions;
 
   /// TDocVariant options to be used for case-sensitive TSynNameValue-like
   // storage, with optional extended JSON syntax serialization
   // - consider using JSON_FAST_EXTENDED for case-insensitive objects
+  /// TDocVariant 选项用于区分大小写的 TSynNameValue 类存储，具有可选的扩展 JSON 语法序列化
+   // - 考虑对不区分大小写的对象使用 JSON_FAST_EXTENDED  
   JSON_NAMEVALUE: TDocVariantOptionsBool;
 
   /// TDocVariant options to be used for case-sensitive TSynNameValue-like
   // storage, RawUtf8 interning and optional extended JSON syntax serialization
   // - consider using JSON_FAST_EXTENDED for case-insensitive objects,
   // or JSON_NAMEVALUE[] if you don't expect names and values interning
+  /// TDocVariant 选项用于区分大小写的 TSynNameValue 类存储、RawUtf8 驻留和可选的扩展 JSON 语法序列化
+   // - 考虑对不区分大小写的对象使用 JSON_FAST_EXTENDED，如果您不希望名称和值驻留，请考虑使用 JSON_NAMEVALUE[]
   JSON_NAMEVALUEINTERN: TDocVariantOptionsBool;
 
   // - JSON_OPTIONS[false] is e.g. _Json() and _JsonFmt() functions default
   // - JSON_OPTIONS[true] are used e.g. by _JsonFast() and _JsonFastFmt() functions
   // - handle only currency for floating point values: use JSON_FAST_FLOAT/JSON_[mFastFloat]
   // if you want to support double values, with potential precision loss
+  // - JSON_OPTIONS[false] 是例如 _Json() 和 _JsonFmt() 函数默认
+   // - JSON_OPTIONS[true] 用于例如 通过 _JsonFast() 和 _JsonFastFmt() 函数
+   // - 仅处理浮点值的货币：如果您想支持双精度值，请使用 JSON_FAST_FLOAT/JSON_[mFastFloat]，但可能会导致精度损失  
   JSON_OPTIONS: TDocVariantOptionsBool;
 
 // some slightly more verbose backward compatible options
+// 一些稍微详细的向后兼容选项
 {$ifndef PUREMORMOT2}
   JSON_OPTIONS_FAST_STRICT: TDocVariantOptions
     absolute JSON_FAST_STRICT;
@@ -529,20 +725,30 @@ type
   // - note: due to a local variable lifetime change in Delphi 11, don't use
   // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
   // call _DV() and a local TDocVariantData instead of a PDocVariantData
+  /// 指向 TDocVariant 存储的指针
+   // - 由于变体可以通过引用存储（即作为 varByRef），因此通过 DocVariantData(aVariant)^ 或 _Safe(aVariant)^ 而不是 TDocVariantData(aVariant) 使用这样的指针可能是个好主意，
+   // 如果您不这样做的话 确定 aVariant 是如何分配的（可能不是 _Obj/_Json）
+   // - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变体一起使用（例如来自 TList<variant>.GetItem）
+   // - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
   PDocVariantData = ^TDocVariantData;
 
   /// pointer to a dynamic array of TDocVariant storage
+  /// 指向 TDocVariant 存储的动态数组的指针
   PDocVariantDataDynArray = array of PDocVariantData;
 
   /// define the TDocVariant storage layout
   // - if it has one or more named properties, it is a dvObject
   // - if it has no name property, it is a dvArray
+  /// 定义 TDocVariant 存储布局
+   // - 如果它具有一个或多个命名属性，则它是一个 dvObject
+   // - 如果它没有 name 属性，则它是一个 dvArray
   TDocVariantKind = (
     dvUndefined,
     dvObject,
     dvArray);
 
   /// exception class associated to TDocVariant JSON/BSON document
+  /// 与 TDocVariant JSON/BSON 文档关联的异常类
   EDocVariant = class(ESynException)
   protected
     class procedure RaiseSafe(Kind: TDocVariantKind);
@@ -578,9 +784,38 @@ type
   // ! assert(_Json('["one",2,3]')._JSON='["one",2,3]');
   // - it features direct trans-typing into a string encoded as JSON, e.g.:
   // ! assert(_Json('["one",2,3]')='["one",2,3]');
+  /// 用于存储任何基于 JSON/BSON 文档的内容的自定义变体类型
+   // - 即对象的名称/值对或值数组（包括嵌套文档），存储在 TDocVariantData 内存结构中
+   // - 您可以使用 _Obj()/_ObjFast() _Arr()/_ArrFast() _Json()/_JsonFast() 或
+   // _JsonFmt()/_JsonFastFmt() 函数用于创建此类变体的实例
+   // - 属性访问可以通过后期绑定完成 - 对旧版本的 FPC 有一些限制，例如 允许写：
+   // ! TDocVariant.NewFast(aVariant);
+   // ! aVariant.Name := 'John';
+   // ! aVariant.Age := 35;
+   // ! writeln(aVariant.Name,' is ',aVariant.Age,' years old');
+   // - 它还支持一小组伪属性或伪方法：
+   // ! aVariant._Count = DocVariantData(aVariant).Count
+   // ! aVariant._Kind = ord(DocVariantData(aVariant).Kind)
+   // ! aVariant._JSON = DocVariantData(aVariant).JSON
+   // ! aVariant._(i) = DocVariantData(aVariant).Value[i]
+   // ! aVariant.Value(i) = DocVariantData(aVariant).Value[i]
+   // ! aVariant.Value(aName) = DocVariantData(aVariant).Value[aName]
+   // ! aVariant.Name(i) = DocVariantData(aVariant).Name[i]
+   // ! aVariant.Add(aItem) = DocVariantData(aVariant).AddItem(aItem)
+   // ! aVariant._ := aItem = DocVariantData(aVariant).AddItem(aItem)
+   // ! aVariant.Add(aName,aValue) = DocVariantData(aVariant).AddValue(aName,aValue)
+   // ! aVariant.Exists(aName) = DocVariantData(aVariant).GetValueIndex(aName)>=0
+   // ! aVariant.Delete(i) = DocVariantData(aVariant).Delete(i)
+   // ! aVariant.Delete(aName) = DocVariantData(aVariant).Delete(aName)
+   // ! aVariant.NameIndex(aName) = DocVariantData(aVariant).GetValueIndex(aName)
+   // - 它具有直接 JSON 序列化/反序列化的功能，例如：
+    // ! assert(_Json('["one",2,3]')._JSON='["one",2,3]');
+    // - it features direct trans-typing into a string encoded as JSON, e.g.:
+    // ! assert(_Json('["one",2,3]')='["one",2,3]');
   TDocVariant = class(TSynInvokeableVariantType)
   protected
     /// name and values interning are shared among all TDocVariantData instances
+    /// 名称和值实习在所有 TDocVariantData 实例之间共享
     fInternNames, fInternValues: TRawUtf8Interning;
     fInternSafe: TLightLock; // just protect TRawUtf8Interning initialization
     function CreateInternNames: TRawUtf8Interning;
@@ -591,6 +826,8 @@ type
     // properties can be slow - if you expect the data to be read-only or not
     // propagated into another place, set aOptions=[dvoValueCopiedByReference]
     // will increase the process speed a lot
+    /// 初始化一个变体实例来存储一些基于文档的内容
+     // - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，设置 aOptions=[dvoValueCopiedByReference] 将提高处理速度 很多
     class procedure New(out aValue: variant;
       aOptions: TDocVariantOptions = []); overload;
       {$ifdef HASINLINE}inline;{$endif}
@@ -602,15 +839,33 @@ type
     // !begin
     // !  TDocVariant.NewFast(v);
     // !  ...
+    /// 初始化一个变体实例来存储基于每个引用的文档内容
+     // - 与 New(aValue, JSON_FAST) 相同；
+     // - 例如使用 作为
+    // !var
+    // !  v: variant;
+    // !begin
+    // !  TDocVariant.NewFast(v);
+    // !  ...
     class procedure NewFast(out aValue: variant;
       aKind: TDocVariantKind = dvUndefined); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// ensure a variant is a TDocVariant instance
     // - if aValue is not a TDocVariant, will create a new JSON_FAST
+    /// 确保变体是 TDocVariant 实例
+     // - 如果aValue不是TDocVariant，将创建一个新的JSON_FAST
     class procedure IsOfTypeOrNewFast(var aValue: variant);
     /// initialize several variant instances to store document-based content
     // - replace several calls to TDocVariantData.InitFast
     // - to be used e.g. as
+    // !var
+    // !  v1, v2, v3: TDocVariantData;
+    // !begin
+    // !  TDocVariant.NewFast([@v1,@v2,@v3]);
+    // !  ...
+    /// 初始化几个变体实例来存储基于文档的内容
+     // - 替换对 TDocVariantData.InitFast 的多次调用
+     // - 例如使用 作为
     // !var
     // !  v1, v2, v3: TDocVariantData;
     // !begin
@@ -629,6 +884,13 @@ type
     // will increase the process speed a lot
     // - in practice, you should better use _Obj()/_ObjFast() _Arr()/_ArrFast()
     // functions or TDocVariant.NewFast()
+    /// 初始化一个变体实例来存储一些基于文档的内容
+     // - 您可以使用此函数创建一个变体，该变体可以嵌套到
+     // 另一个文档，例如：
+    // ! aVariant := TDocVariant.New;
+    // ! aVariant.id := 10;
+     // - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，设置 Options=[dvoValueCopiedByReference] 将提高处理速度很多
+     // - 在实践中，您应该更好地使用 _Obj()/_ObjFast() _Arr()/_ArrFast() 函数或 TDocVariant.NewFast()    
     class function New(Options: TDocVariantOptions = []): variant; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize a variant instance to store some document-based object content
@@ -645,6 +907,16 @@ type
     // will increase the process speed a lot
     // - in practice, you should better use the function _Obj() which is a
     // wrapper around this class method
+    /// 初始化一个变体实例来存储一些基于文档的对象内容
+     // - 对象将使用两个两个提供的数据进行初始化，如名称、值
+     // 对，例如
+     // ! aVariant := TDocVariant.NewObject(['name','John','year',1972]);
+     // 与以下内容相同：
+    // ! TDocVariant.New(aVariant);
+    // ! TDocVariantData(aVariant).AddValue('name','John');
+    // ! TDocVariantData(aVariant).AddValue('year',1972);
+     // - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，设置 Options=[dvoValueCopiedByReference] 将提高处理速度 很多
+     // - 在实践中，您应该更好地使用函数 _Obj()，它是此类方法的包装器
     class function NewObject(const NameValuePairs: array of const;
       Options: TDocVariantOptions = []): variant;
     /// initialize a variant instance to store some document-based array content
@@ -661,10 +933,22 @@ type
     // will increase the process speed a lot
     // - in practice, you should better use the function _Arr() which is a
     // wrapper around this class method
+    /// 初始化一个变体实例来存储一些基于文档的数组内容
+     // - 数组将使用作为参数提供的数据进行初始化，例如
+    // ! aVariant := TDocVariant.NewArray(['one',2,3.0]);
+     // 与以下内容相同：
+    // ! TDocVariant.New(aVariant);
+    // ! TDocVariantData(aVariant).AddItem('one');
+    // ! TDocVariantData(aVariant).AddItem(2);
+    // ! TDocVariantData(aVariant).AddItem(3.0);
+     // - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，设置 aOptions=[dvoValueCopiedByReference] 将提高处理速度 很多
+     // - 在实践中，您应该更好地使用函数 _Arr()，它是此类方法的包装器
     class function NewArray(const Items: array of const;
       Options: TDocVariantOptions = []): variant; overload;
     /// initialize a variant instance to store some document-based array content
     // - array will be initialized with data supplied dynamic array of variants
+    /// 初始化一个变体实例来存储一些基于文档的数组内容
+     // - 数组将使用提供的数据进行初始化 动态变量数组
     class function NewArray(const Items: TVariantDynArray;
       Options: TDocVariantOptions = []): variant; overload;
     /// initialize a variant instance to store some document-based object content
@@ -694,6 +978,26 @@ type
     // will increase the process speed a lot
     // - in practice, you should better use the function _Json()/_JsonFast()
     // which are handy wrappers around this class method
+    /// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的对象内容
+     // - 除了 JSON RFC 规范严格模式之外，此方法还将处理一些类似 BSON 的扩展，例如 不带引号的字段名称
+     // - 将使用传入 JSON 缓冲区的私有副本，然后它将调用 TDocVariantData.InitJsonInPlace() 方法
+     // - 例如使用 作为：
+    // ! var V: variant;
+    // ! begin
+    // !   V := TDocVariant.NewJson('{"id":10,"doc":{"name":"John","birthyear":1972}}');
+    // !   assert(V.id=10);
+    // !   assert(V.doc.name='John');
+    // !   assert(V.doc.birthYear=1972);
+    // !   // and also some pseudo-properties:
+    // !   assert(V._count=2);
+    // !   assert(V.doc._kind=ord(dvObject));
+     // - 或使用 JSON 数组：
+    // !   V := TDocVariant.NewJson('["one",2,3]');
+    // !   assert(V._kind=ord(dvArray));
+    // !   for i := 0 to V._count-1 do
+    // !     writeln(V._(i));
+     // - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，在选项中添加 dvoValueCopiedByReference 将大大提高处理速度
+     // - 在实践中，您应该更好地使用函数 _Json()/_JsonFast()，它们是此类方法的方便包装器
     class function NewJson(const Json: RawUtf8;
       Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty]): variant;
       {$ifdef HASINLINE}inline;{$endif}
@@ -708,6 +1012,15 @@ type
     // !  _Unique(oSeasons);
     // or even:
     // !  oSeasons := _Copy(o.Seasons);
+    /// 初始化变体实例以存储来自提供的现有 TDocVariant 实例的一些基于文档的对象内容
+     // - 在作为 varByRef 返回的值上使用它（例如通过 _() 伪方法），以确保返回的变体将表现为独立值
+     // - 例如，以下内容：
+     // !  oSeasons := TDocVariant.NewUnique(o.Seasons);
+     // 是相同的：
+     // ! 	oSeasons := o.Seasons;
+     // !  _Unique(oSeasons);
+     // 甚至：
+     // !  oSeasons := _Copy(o.Seasons);
     class function NewUnique(const SourceDocVariant: variant;
       Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty]): variant;
       {$ifdef HASINLINE}inline;{$endif}
@@ -715,80 +1028,116 @@ type
     // - if the value is a dvArray with one single item, it will this value
     // - if the value is not a TDocVariant nor a dvArray with one single item,
     // it wil return the default value
+    /// 将返回 TDocVariant 数组的唯一元素或默认值
+     // - 如果该值是具有单个项目的 dvArray，则它将是该值
+     // - 如果该值不是 TDocVariant 也不是只有一个项目的 dvArray，它将返回默认值
     class procedure GetSingleOrDefault(const docVariantArray, default: variant;
       var result: variant);
 
     /// finalize the stored information
+    /// 最终确定存储的信息
     destructor Destroy; override;
     /// used by dvoInternNames for string interning of all Names[] values
+    /// 由 dvoInternNames 用于所有 Names[] 值的字符串驻留
     function InternNames: TRawUtf8Interning;
       {$ifdef HASINLINE}inline;{$endif}
     /// used by dvoInternValues for string interning of all RawUtf8 Values[]
+    /// 由 dvoInternValues 用于所有 RawUtf8 Values[] 的字符串驻留
     function InternValues: TRawUtf8Interning;
       {$ifdef HASINLINE}inline;{$endif}
     // this implementation will write the content as JSON object or array
+    // 此实现会将内容写入 JSON 对象或数组
     procedure ToJson(W: TJsonWriter; Value: PVarData); override;
     /// will check if the value is an array, and return the number of items
     // - if the document is an array, will return the items count (0 meaning
     // void array) - used e.g. by TSynMustacheContextVariant
     // - this overridden method will implement it for dvArray instance kind
+    /// 将检查该值是否为数组，并返回项目数
+     // - 如果文档是一个数组，将返回项目计数（0 表示无效数组） - 例如使用 通过 TSynMustacheContextVariant
+     // - 这个重写的方法将为 dvArray 实例类型实现它
     function IterateCount(const V: TVarData;
       GetObjectAsValues: boolean): integer; override;
     /// allow to loop over an array document
     // - Index should be in 0..IterateCount-1 range
     // - this default implementation will do handle dvArray instance kind
+    /// 允许循环遍历数组文档
+     // - 索引应该在 0..IterateCount-1 范围内
+     // - 这个默认实现将处理 dvArray 实例类型
     procedure Iterate(var Dest: TVarData; const V: TVarData;
       Index: integer); override;
     /// returns true if this document has Count = 0
+    /// 如果此文档的 Count = 0，则返回 true
     function IsVoid(const V: TVarData): boolean; override;
     /// low-level callback to access internal pseudo-methods
     // - mainly the _(Index: integer): variant method to retrieve an item
     // if the document is an array
+    /// 访问内部伪方法的低级回调
+     // - 主要是 _(Index:integer): 如果文档是数组，则用于检索项目的变体方法
     function DoFunction(var Dest: TVarData; const V: TVarData;
       const Name: string; const Arguments: TVarDataArray): boolean; override;
     /// low-level callback to access internal pseudo-methods
+    /// 访问内部伪方法的低级回调
     function DoProcedure(const V: TVarData; const Name: string;
       const Arguments: TVarDataArray): boolean; override;
     /// low-level callback to clear the content
+    /// 清除内容的低级回调
     procedure Clear(var V: TVarData); override;
     /// low-level callback to copy two variant content
     // - such copy will by default be done by-value, for safety
     // - if you are sure you will use the variants as read-only, you can set
     // the dvoValueCopiedByReference Option to use faster by-reference copy
+    /// 复制两个变体内容的低级回调
+     // - 为了安全起见，这种复制默认情况下将按值完成
+     // - 如果您确定将使用只读变体，则可以设置 dvoValueCopiedByReference 选项以使用更快的按引用复制
     procedure Copy(var Dest: TVarData; const Source: TVarData;
       const Indirect: boolean); override;
     /// copy two variant content by value
     // - overridden method since instance may use a by-reference copy pattern
+    /// 按值复制两个变体内容
+     // - 重写方法，因为实例可能使用引用复制模式
     procedure CopyByValue(var Dest: TVarData; const Source: TVarData); override;
     /// handle type conversion
     // - only types processed by now are string/OleStr/UnicodeString/date
+    /// 处理类型转换
+     // - 目前仅处理的类型是 string/OleStr/UnicodeString/date
     procedure Cast(var Dest: TVarData; const Source: TVarData); override;
     /// handle type conversion
     // - only types processed by now are string/OleStr/UnicodeString/date
+    /// 处理类型转换
+     // - 目前仅处理的类型是 string/OleStr/UnicodeString/date
     procedure CastTo(var Dest: TVarData; const Source: TVarData;
       const AVarType: TVarType); override;
     /// compare two variant values
     // - redirect to case-sensitive FastVarDataComp() comparison
+    /// 比较两个变量值
+     // - 重定向到区分大小写的 FastVarDataComp() 比较
     procedure Compare(const Left, Right: TVarData;
       var Relationship: TVarCompareResult); override;
     /// overriden method for actual getter by name implementation
+    /// 按名称实现实际 getter 的重写方法
     function IntGet(var Dest: TVarData; const Instance: TVarData;
       Name: PAnsiChar; NameLen: PtrInt; NoException: boolean): boolean; override;
     /// overriden method for actual setter by name implementation
+    /// 按名称实现实际设置器的重写方法
     function IntSet(const Instance, Value: TVarData;
       Name: PAnsiChar; NameLen: PtrInt): boolean; override;
   end;
 
   /// method used by TDocVariantData.ReduceAsArray to filter each object
   // - should return TRUE if the item match the expectations
+  /// TDocVariantData.ReduceAsArray 使用的方法来过滤每个对象
+   // - 如果项目符合预期，则应返回 TRUE
   TOnReducePerItem = function(Item: PDocVariantData): boolean of object;
 
   /// method used by TDocVariantData.ReduceAsArray to filter each object
   // - should return TRUE if the item match the expectations
+  /// TDocVariantData.ReduceAsArray 使用的方法来过滤每个对象
+   // - 如果项目符合预期，则应返回 TRUE
   TOnReducePerValue = function(const Value: variant): boolean of object;
 
   {$ifdef HASITERATORS}
   /// internal state engine used by TDocVariant enumerators records
+  /// TDocVariant 枚举器记录使用的内部状态引擎
   TDocVariantEnumeratorState = record
   private
     Curr, After: PVariant;
@@ -802,15 +1151,20 @@ type
   // and TDocVariantData.Fields
   // - we use pointers for best performance - but warning: Name may be nil for
   // TDocVariantData.GetEnumerator over an array
+  /// TDocVariantData.GetEnumerator 和 TDocVariantData.Fields 返回的本地迭代名称/值对
+   // - 我们使用指针以获得最佳性能 - 但警告：对于数组上的 TDocVariantData.GetEnumerator，名称可能为 nil
   TDocVariantFields = record
     /// points to current Name[] - nil if the TDocVariantData is an array
+    /// 指向当前 Name[] - 如果 TDocVariantData 是数组则为零
     Name: PRawUtf8;
     /// points to the current Value[] - never nil
+    /// 指向当前 Value[] - 绝不为零
     Value: PVariant;
   end;
 
   /// low-level Enumerator as returned by TDocVariantData.GetEnumerator
   // (default "for .. in dv do") and TDocVariantData.Fields
+  /// 由 TDocVariantData.GetEnumerator （默认“for .. in dv do”）和 TDocVariantData.Fields 返回的低级枚举器
   TDocVariantFieldsEnumerator = record
   private
     State: TDocVariantEnumeratorState;
@@ -820,11 +1174,13 @@ type
     function MoveNext: Boolean; inline;
     function GetEnumerator: TDocVariantFieldsEnumerator; inline;
     /// returns the current Name/Value or Value as pointers in TDocVariantFields
+    /// 返回当前名称/值或值作为 TDocVariantFields 中的指针
     property Current: TDocVariantFields
       read GetCurrent;
   end;
 
   /// low-level Enumerator as returned by TDocVariantData.FieldNames
+  /// TDocVariantData.FieldNames 返回的低级枚举器
   TDocVariantFieldNamesEnumerator = record
   private
     Curr, After: PRawUtf8;
@@ -832,11 +1188,13 @@ type
     function MoveNext: Boolean; inline;
     function GetEnumerator: TDocVariantFieldNamesEnumerator; inline;
     /// returns the current Name/Value or Value as pointers in TDocVariantFields
+    /// 返回当前名称/值或值作为 TDocVariantFields 中的指针
     property Current: PRawUtf8
       read Curr;
   end;
 
   /// low-level Enumerator as returned by TDocVariantData.Items and FieldValues
+  /// 由 TDocVariantData.Items 和 FieldValues 返回的低级枚举器
   TDocVariantItemsEnumerator = record
   private
     State: TDocVariantEnumeratorState;
@@ -844,11 +1202,13 @@ type
     function MoveNext: Boolean; inline;
     function GetEnumerator: TDocVariantItemsEnumerator; inline;
     /// returns the current Value as pointer
+    /// 返回当前值作为指针
     property Current: PVariant
       read State.Curr;
   end;
 
   /// low-level Enumerator as returned by TDocVariantData.Objects
+  /// TDocVariantData.Objects 返回的低级枚举器
   TDocVariantObjectsEnumerator = record
   private
     State: TDocVariantEnumeratorState;
@@ -857,18 +1217,21 @@ type
     function MoveNext: Boolean; {$ifdef HASSAFEINLINE} inline; {$endif}
     function GetEnumerator: TDocVariantObjectsEnumerator; inline;
     /// returns the current Value as pointer to each TDocVariantData object
+    /// 返回当前值作为指向每个 TDocVariantData 对象的指针
     property Current: PDocVariantData
       read Value;
   end;
   {$endif HASITERATORS}
 
   /// how duplicated values could be searched
+  /// 如何搜索重复值
   TSearchDuplicate = (
     sdNone,
     sdCaseSensitive,
     sdCaseInsensitive);
 
   {$A-} { packet object not allowed since Delphi 2009 :( }
+  { 自 Delphi 2009 起不允许使用数据包对象:( }
   /// memory structure used for TDocVariant storage of any JSON/BSON
   // document-based content as variant
   // - i.e. name/value pairs for objects, or an array of values (including
@@ -891,6 +1254,23 @@ type
   // former will handle internal variant redirection (varByRef), e.g. from late
   // binding or assigned another TDocVariant
   // - Delphi "object" is buggy on stack -> also defined as record with methods
+  /// 用于 TDocVariant 存储任何基于 JSON/BSON 文档的内容作为变体的内存结构
+   // - 即对象的名称/值对，或值数组（包括嵌套文档）
+   // - 您可以使用 _Obj()/_ObjFast() _Arr()/_ArrFast() _Json()/_JsonFast() 或
+   // _JsonFmt()/_JsonFastFmt() 函数用于创建此类变体的实例
+   // - 您可以将此类分配的变体转换为 TDocVariantData 以直接访问其内部（如 Count 或 Values[]/Names[]）：
+   // ! aVariantObject := TDocVariant.NewObject(['name','John','year',1972]);
+   // ! aVariantObject := _ObjFast(['name','John','year',1972]);
+   // ! with _Safe(aVariantObject)^ do
+   // !   for i := 0 to Count-1 do
+   // !     writeln(Names[i],'=',Values[i]); // for an object
+   // ! aVariantArray := TDocVariant.NewArray(['one',2,3.0]);
+   // ! aVariantArray := _JsonFast('["one",2,3.0]');
+   // ! with _Safe(aVariantArray)^ do
+   // !   for i := 0 to Count-1 do
+   // !     writeln(Values[i]); // for an array
+   // - 使用“with _Safe(...)^ do”而不是“with TDocVariantData(...) do”，因为前者将处理内部变量重定向（varByRef），例如 来自后期绑定或分配另一个 TDocVariant
+   // - Delphi“对象”在堆栈上存在错误 -> 也定义为带有方法的记录
   {$ifdef USERECORDWITHMETHODS}
   TDocVariantData = record
   {$else}
@@ -898,24 +1278,29 @@ type
   {$endif USERECORDWITHMETHODS}
   private
     // note: this structure uses all TVarData available space: no filler needed!
+    // 注意：此结构使用所有 TVarData 可用空间：无需填充！
     VType: TVarType;              // 16-bit
     VOptions: TDocVariantOptions; // 16-bit
     VName: TRawUtf8DynArray;      // pointer
     VValue: TVariantDynArray;     // pointer
     VCount: integer;              // 32-bit
     // retrieve the value as varByRef
+    // 以 varByRef 形式检索值
     function GetValueOrItem(const aNameOrIndex: variant): variant;
     procedure SetValueOrItem(const aNameOrIndex, aValue: variant);
     // kind is stored as dvoIsArray/dvoIsObject within VOptions
+    // kind 在 VOptions 中存储为 dvoIsArray/dvoIsObject
     function GetKind: TDocVariantKind;
       {$ifdef HASINLINE}inline;{$endif}
     procedure SetOptions(const opt: TDocVariantOptions); // keep dvoIsObject/Array
       {$ifdef HASINLINE}inline;{$endif}
     // capacity is Length(VValue) and Length(VName)
+    // 容量为 Length(VValue) 和 Length(VName)
     procedure SetCapacity(aValue: integer);
     function GetCapacity: integer;
       {$ifdef HASINLINE}inline;{$endif}
     // implement U[] I[] B[] D[] O[] O_[] A[] A_[] _[] properties
+    // 实现 U[] I[] B[] D[] O[] O_[] A[] A_[] _[] 属性
     function GetOrAddIndexByName(const aName: RawUtf8): integer;
       {$ifdef HASINLINE}inline;{$endif}
     function GetOrAddPVariantByName(const aName: RawUtf8): PVariant;
@@ -967,15 +1352,31 @@ type
     // !  assert(variant(Doc).name='John');
     // !end;
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个TDocVariantData来存储一些基于文档的内容
+     // - 可与堆栈分配的 TDocVariantData 变量一起使用：
+    // !var
+    // !  Doc: TDocVariantData; // stack-allocated variable
+    // !begin
+    // !  Doc.Init;
+    // !  Doc.AddValue('name','John');
+    // !  assert(Doc.Value['name']='John');
+    // !  assert(variant(Doc).name='John');
+    // !end;
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure Init(aOptions: TDocVariantOptions = []); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize a TDocVariantData to store a content of some known type
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化 TDocVariantData 来存储某种已知类型的内容
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure Init(aOptions: TDocVariantOptions;
       aKind: TDocVariantKind); overload;
     /// initialize a TDocVariantData to store some document-based content
     // - use the options corresponding to the supplied TDocVariantModel
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个TDocVariantData来存储一些基于文档的内容
+     // - 使用与提供的 TDocVariantModel 相对应的选项
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure Init(aModel: TDocVariantModel;
       aKind: TDocVariantKind = dvUndefined); overload;
       {$ifdef HASINLINE}inline;{$endif}
@@ -993,11 +1394,27 @@ type
     // - see also TDocVariant.NewFast() if you want to initialize several
     // TDocVariantData variable instances at once
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化 TDocVariantData 来存储基于每个引用的文档内容
+     // - 与 Doc.Init(JSON_FAST) 相同；
+     // - 可与堆栈分配的 TDocVariantData 变量一起使用：
+    // !var
+    // !  Doc: TDocVariantData; // stack-allocated variable
+    // !begin
+    // !  Doc.InitFast;
+    // !  Doc.AddValue('name','John');
+    // !  assert(Doc.Value['name']='John');
+    // !  assert(variant(Doc).name='John');
+    // !end;
+     // - 如果您想初始化多个，另请参见 TDocVariant.NewFast()
+     // 一次 TDocVariantData 变量实例
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitFast(aKind: TDocVariantKind = dvUndefined); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize a TDocVariantData to store per-reference document-based content
     // - this overloaded method allows to specify an estimation of how many
     // properties or items this aKind document would contain
+    /// 初始化 TDocVariantData 来存储基于每个引用的文档内容
+     // - 此重载方法允许指定此 aKind 文档将包含多少属性或项目的估计
     procedure InitFast(InitialCapacity: integer; aKind: TDocVariantKind); overload;
     /// initialize a TDocVariantData to store document-based object content
     // - object will be initialized with data supplied two by two, as Name,Value
@@ -1014,10 +1431,27 @@ type
     // !  Doc.AddValue('year',1972);
     // - this method is called e.g. by _Obj() and _ObjFast() global functions
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个TDocVariantData来存储基于文档的对象内容
+     // - 对象将使用两个两个提供的数据进行初始化，如名称、值
+     // 对，例如
+    // !var
+    // !  Doc: TDocVariantData; // stack-allocated variable
+    // !begin
+    // !  Doc.InitObject(['name','John','year',1972]);
+    // which is the same as:
+    // ! var Doc: TDocVariantData;
+    // !begin
+    // !  Doc.Init;
+    // !  Doc.AddValue('name','John');
+    // !  Doc.AddValue('year',1972);
+     // - 这个方法被称为例如 通过 _Obj() 和 _ObjFast() 全局函数
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitObject(const NameValuePairs: array of const;
       aOptions: TDocVariantOptions = []); overload;
     /// initialize a TDocVariantData to store document-based object content
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个TDocVariantData来存储基于文档的对象内容
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitObject(const NameValuePairs: array of const;
       Model: TDocVariantModel); overload;
     /// initialize a variant instance to store some document-based array content
@@ -1042,10 +1476,34 @@ type
     // !end;
     // - this method is called e.g. by _Arr() and _ArrFast() global functions
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个变体实例来存储一些基于文档的数组内容
+     // - 数组将使用作为参数提供的数据进行初始化，例如
+    // !var
+    // !  Doc: TDocVariantData; // stack-allocated variable
+    // !begin
+    // !  Doc.InitArray(['one',2,3.0]);
+    // !  assert(Doc.Count=3);
+    // !end;
+     // 与以下内容相同：
+    // ! var Doc: TDocVariantData;
+    // !     i: integer;
+    // !begin
+    // !  Doc.Init;
+    // !  Doc.AddItem('one');
+    // !  Doc.AddItem(2);
+    // !  Doc.AddItem(3.0);
+    // !  assert(Doc.Count=3);
+    // !  for i := 0 to Doc.Count-1 do
+    // !    writeln(Doc.Value[i]);
+    // !end;
+     // - 这个方法被称为例如 通过 _Arr() 和 _ArrFast() 全局函数
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitArray(const aItems: array of const;
       aOptions: TDocVariantOptions = []); overload;
     /// initialize a variant instance to store some document-based array content
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个变体实例来存储一些基于文档的数组内容
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitArray(const aItems: array of const;
       aModel: TDocVariantModel); overload;
     /// initialize a variant instance to store some document-based array content
@@ -1054,35 +1512,50 @@ type
     // - will be almost immediate, since TVariantDynArray is reference-counted,
     // unless ItemsCopiedByReference is set to FALSE
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个变体实例来存储一些基于文档的数组内容
+     // - 数组将使用作为变体动态数组提供的数据进行初始化
+     // - 如果 Items 为 []，则变体将设置为 null
+     // - 几乎是立即的，因为 TVariantDynArray 是引用计数的，除非 ItemsCopiedByReference 设置为 FALSE
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitArrayFromVariants(const aItems: TVariantDynArray;
       aOptions: TDocVariantOptions = [];
       aItemsCopiedByReference: boolean = true; aCount: integer = -1);
     /// initialize a variant array instance from an object Values[]
+    /// 从对象 Values[] 初始化变体数组实例
     procedure InitArrayFromObjectValues(const aObject: variant;
       aOptions: TDocVariantOptions = []; aItemsCopiedByReference: boolean = true);
     /// initialize a variant array instance from an object Names[]
+    /// 从对象 Names[] 初始化变体数组实例
     procedure InitArrayFromObjectNames(const aObject: variant;
       aOptions: TDocVariantOptions = []; aItemsCopiedByReference: boolean = true);
     /// initialize a variant instance to store some RawUtf8 array content
+    /// 初始化一个变体实例来存储一些RawUtf8数组内容
     procedure InitArrayFrom(const aItems: TRawUtf8DynArray;
       aOptions: TDocVariantOptions; aCount: integer = -1); overload;
     /// initialize a variant instance to store some 32-bit integer array content
+    /// 初始化一个变体实例来存储一些32位整数数组内容
     procedure InitArrayFrom(const aItems: TIntegerDynArray;
       aOptions: TDocVariantOptions; aCount: integer = -1); overload;
     /// initialize a variant instance to store some 64-bit integer array content
+    /// 初始化一个变体实例来存储一些64位整数数组内容
     procedure InitArrayFrom(const aItems: TInt64DynArray;
       aOptions: TDocVariantOptions; aCount: integer = -1); overload;
     /// initialize a variant instance to store some double array content
+    /// 初始化一个变体实例来存储一些双数组内容
     procedure InitArrayFrom(const aItems: TDoubleDynArray;
       aOptions: TDocVariantOptions; aCount: integer = -1); overload;
     /// initialize a variant instance to store some dynamic array content
+    /// 初始化一个变体实例来存储一些动态数组内容
     procedure InitArrayFrom(var aItems; ArrayInfo: PRttiInfo;
       aOptions: TDocVariantOptions; ItemsCount: PInteger = nil); overload;
     /// initialize a variant instance to store some TDynArray content
+    /// 初始化一个变体实例来存储一些TDynArray内容
     procedure InitArrayFrom(const aItems: TDynArray;
       aOptions: TDocVariantOptions = JSON_FAST_FLOAT); overload;
     /// initialize a variant instance to store a T*ObjArray content
     // - will call internally ObjectToVariant() to make the conversion
+    /// 初始化一个变体实例来存储T*ObjArray内容
+     // - 将在内部调用 ObjectToVariant() 进行转换
     procedure InitArrayFromObjArray(const ObjArray; aOptions: TDocVariantOptions;
       aWriterOptions: TTextWriterWriteObjectOptions = [woDontStoreDefault];
       aCount: integer = -1);
@@ -1095,12 +1568,12 @@ type
     // - in expanded mode, the fields order won't be checked, as with TOrmTableJson
     // - warning: the incoming JSON buffer will be modified in-place: so you should
     // make a private copy before running this method, as overloaded procedures do
-    // - some numbers on a Core i5-13500, extracted from our regression tests:
-    // $ TDocVariant InitJsonInPlace in 72.91ms i.e. 2.1M rows/s, 268.8 MB/s
-    // $ TDocVariant InitJsonInPlace no guess in 69.49ms i.e. 2.2M rows/s, 282 MB/s
-    // $ TDocVariant InitJsonInPlace dvoIntern in 68.41ms i.e. 2.2M rows/s, 286.5 MB/s
-    // $ TDocVariant FromResults exp in 31.69ms i.e. 4.9M rows/s, 618.6 MB/s
-    // $ TDocVariant FromResults not exp in 24.48ms i.e. 6.4M rows/s, 352.1 MB/s
+    /// 从标准或非扩展 JSON ORM/DB 结果填充 TDocVariant 数组
+     // - 接受 TOrmTableJson 识别的 ORM/DB 结果双重格式，即 [{"f1":"1v1","f2":1v2},{"f2":"2v1","f2":2v2} ...] 和 {"fieldCount":2,"values":["f1","f2","1v1",1v2,"2v1",2v2...],"rowCount":20}
+     // - 比 Doc.InitJsonInPlace() 快大约 2 倍（展开）或 3 倍（非展开）
+     // - 也将使用更少的内存，因为所有对象字段名称将被共享
+     // - 在扩展模式下，不会检查字段顺序，与 TOrmTableJson 一样
+     // - 警告：传入的 JSON 缓冲区将被就地修改：因此您应该在运行此方法之前创建一个私有副本，就像重载过程一样
     function InitArrayFromResults(Json: PUtf8Char; JsonLen: PtrInt;
       aOptions: TDocVariantOptions = JSON_FAST_FLOAT): boolean; overload;
     /// fill a TDocVariant array from standard or non-expanded JSON ORM/DB result
@@ -1109,6 +1582,12 @@ type
     // - will also use less memory, because all object field names will be shared
     // - in expanded mode, the fields order won't be checked, as with TOrmTableJson
     // - a private copy of the incoming JSON buffer will be used before parsing
+    /// 从标准或非扩展 JSON ORM/DB 结果填充 TDocVariant 数组
+     // - 接受 TOrmTableJson 识别的 ORM/DB 结果双格式
+     // - 比 Doc.InitJson() 快大约 2 倍（展开）或 3 倍（非展开）
+     // - 也将使用更少的内存，因为所有对象字段名称将被共享
+     // - 在扩展模式下，不会检查字段顺序，与 TOrmTableJson 一样
+     // - 在解析之前将使用传入 JSON 缓冲区的私有副本
     function InitArrayFromResults(const Json: RawUtf8;
       aOptions: TDocVariantOptions = JSON_FAST_FLOAT): boolean; overload;
     /// fill a TDocVariant array from standard or non-expanded JSON ORM/DB result
@@ -1117,6 +1596,12 @@ type
     // - will also use less memory, because all object field names will be shared
     // - in expanded mode, the fields order won't be checked, as with TOrmTableJson
     // - a private copy of the incoming JSON buffer will be used before parsing
+    /// 从标准或非扩展 JSON ORM/DB 结果填充 TDocVariant 数组
+     // - 接受 TOrmTableJson 识别的 ORM/DB 结果双格式
+     // - 比 Doc.InitJson() 快大约 2 倍（展开）或 3 倍（非展开）
+     // - 也将使用更少的内存，因为所有对象字段名称将被共享
+     // - 在扩展模式下，不会检查字段顺序，与 TOrmTableJson 一样
+     // - 在解析之前将使用传入 JSON 缓冲区的私有副本
     function InitArrayFromResults(const Json: RawUtf8;
       aModel: TDocVariantModel): boolean; overload;
       {$ifdef HASINLINE} inline; {$endif}
@@ -1126,6 +1611,11 @@ type
     // will be set as null
     // - will be almost immediate, since Names and Values are reference-counted
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个变体实例来存储一些基于文档的对象内容
+     // - 对象将使用动态数组提供的名称和值进行初始化
+     // - 如果 aNames 和 aValues 为 [] 或确实具有匹配的大小，则变体将设置为 null
+     // - 几乎是立即的，因为名称和值是引用计数的
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitObjectFromVariants(const aNames: TRawUtf8DynArray;
        const aValues: TVariantDynArray; aOptions: TDocVariantOptions = []);
     /// initialize a variant instance to store a document-based object with a
@@ -1133,6 +1623,9 @@ type
     // - the supplied path could be 'Main.Second.Third', to create nested
     // objects, e.g. {"Main":{"Second":{"Third":value}}}
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化一个变体实例来存储具有单个属性的基于文档的对象
+     // - 提供的路径可以是“Main.Second.Third”，用于创建嵌套对象，例如 {“主”：{“第二”：{“第三”：值}}}
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitObjectFromPath(const aPath: RawUtf8; const aValue: variant;
       aOptions: TDocVariantOptions = []; aPathDelim: AnsiChar = '.');
     /// initialize a variant instance to store some document-based object content
@@ -1143,6 +1636,12 @@ type
     // with a temporary JSON buffer content created from a set of parameters
     // - if you call Init*() methods in a row, ensure you call Clear in-between
     // - consider the faster InitArrayFromResults() from ORM/SQL JSON results
+    /// 初始化变体实例以存储来自提供的 JSON 数组或 JSON 对象内容的一些基于文档的对象内容
+     // - 警告：传入的 JSON 缓冲区将被就地修改：所以你应该
+     // 在运行此方法之前创建一个私有副本，就像 InitJson() 所做的那样
+     // - 这个方法被称为例如 通过 _JsonFmt() _JsonFastFmt() 全局函数，具有从一组参数创建的临时 JSON 缓冲区内容
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
+     // - 考虑来自 ORM/SQL JSON 结果的更快的 InitArrayFromResults()
     function InitJsonInPlace(Json: PUtf8Char;
       aOptions: TDocVariantOptions = [];
       aEndOfObject: PUtf8Char = nil): PUtf8Char;
@@ -1155,6 +1654,12 @@ type
     // - handle only currency for floating point values: set JSON_FAST_FLOAT
     // or dvoAllowDoubleValue option to support double, with potential precision loss
     // - consider the faster InitArrayFromResults() from ORM/SQL JSON results
+    /// 初始化变体实例以存储来自提供的 JSON 数组或 JSON 对象内容的一些基于文档的对象内容
+     // - 将使用传入 JSON 缓冲区的私有副本，然后它将调用另一个重载的 InitJsonInPlace() 方法
+     // - 这个方法被称为例如 通过 _Json() 和 _JsonFast() 全局函数
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
+     // - 仅处理浮点值的货币：设置 JSON_FAST_FLOAT 或 dvoAllowDoubleValue 选项以支持双精度，但可能会导致精度损失
+     // - 考虑来自 ORM/SQL JSON 结果的更快的 InitArrayFromResults()
     function InitJson(const Json: RawUtf8;
       aOptions: TDocVariantOptions = []): boolean; overload;
     /// initialize a variant instance to store some document-based object content
@@ -1164,6 +1669,12 @@ type
     // - if you call Init*() methods in a row, ensure you call Clear in-between
     // - handle only currency for floating point values unless you set mFastFloat
     // - consider the faster InitArrayFromResults() from ORM/SQL JSON results
+    /// 初始化变体实例以存储来自提供的 JSON 数组或 JSON 对象内容的一些基于文档的对象内容
+     // - 使用与提供的 TDocVariantModel 相对应的选项
+     // - 将创建传入 JSON 缓冲区的私有副本
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
+     // - 仅处理浮点值的货币，除非您设置 mFastFloat
+     // - 考虑来自 ORM/SQL JSON 结果的更快的 InitArrayFromResults()
     function InitJson(const Json: RawUtf8; aModel: TDocVariantModel): boolean; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// initialize a variant instance to store some document-based object content
@@ -1173,6 +1684,11 @@ type
     // - handle only currency for floating point values: set JSON_FAST_FLOAT
     // or dvoAllowDoubleValue option to support double, with potential precision loss
     // - will assume text file with no BOM is already UTF-8 encoded
+    /// 初始化一个变体实例以存储包含某些 JSON 数组或 JSON 对象的文件中的一些基于文档的对象内容
+     // - 文件可能已使用 SaveToJsonFile() 方法序列化
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
+     // - 仅处理浮点值的货币：设置 JSON_FAST_FLOAT 或 dvoAllowDoubleValue 选项以支持双精度，但可能会导致精度损失
+     // - 假设没有 BOM 的文本文件已经是 UTF-8 编码的
     function InitJsonFromFile(const FileName: TFileName;
       aOptions: TDocVariantOptions = []): boolean;
     /// ensure a document-based variant instance will have one unique options set
@@ -1186,17 +1702,30 @@ type
     // - you may rather use _Unique() or _UniqueFast() wrappers if you want to
     // ensure that a TDocVariant instance is unique
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 确保基于文档的变体实例将具有一个唯一的选项集
+     // - 这将创建所提供的 TDocVariant 实例的副本，强制所有嵌套事件具有相同的选项集
+     // - 您可以使用此函数来确保复制此变体的所有内部属性，例如 每个引用（如果您设置 JSON_[mDefault]）或每个值（如果您设置 JSON_[mDefault]）无论创建嵌套对象或数组时使用的选项
+     // - 如果提供的变体不是 TDocVariant，将引发 EDocVariant
+     // - 如果您想确保 TDocVariant 实例是唯一的，您可能更愿意使用 _Unique() 或 _UniqueFast() 包装器
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitCopy(const SourceDocVariant: variant;
       aOptions: TDocVariantOptions);
     /// clone a document-based variant with the very same options but no data
     // - the same options will be used, without the dvArray/dvObject flags
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 克隆一个基于文档的变体，具有相同的选项，但没有数据
+     // - 将使用相同的选项，但没有 dvArray/dvObject 标志
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitClone(const CloneFrom: TDocVariantData);
       {$ifdef HASINLINE}inline;{$endif}
     /// low-level copy a document-based variant with the very same options and count
     // - if you call Init*() methods in a row, ensure you call Clear in-between
     // - will copy Count and Names[] by reference, but Values[] only if CloneValues
     // - returns the first item in Values[]
+    /// 低级复制具有相同选项和计数的基于文档的变体
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
+     // - 将通过引用复制 Count 和 Names[]，但仅当 CloneValues 时才复制 Values[]
+     // - 返回 Values[] 中的第一项
     function InitFrom(const CloneFrom: TDocVariantData; CloneValues: boolean;
       MakeUnique: boolean = false): PVariant;
       {$ifdef HASINLINE}inline;{$endif}
@@ -1205,6 +1734,10 @@ type
     // - the supplied content may have been generated by ToTextPairs() method
     // - if ItemSep=#10, then any kind of line feed (CRLF or LF) will be handled
     // - if you call Init*() methods in a row, ensure you call Clear in-between
+    /// 初始化变体实例以存储来自提供的 CSV UTF-8 编码文本的一些基于文档的对象内容
+     // - 提供的内容可能是由 ToTextPairs() 方法生成的
+     // - 如果 ItemSep=#10，则将处理任何类型的换行符（CRLF 或 LF）
+     // - 如果您连续调用 Init*() 方法，请确保在中间调用 Clear
     procedure InitCsv(aCsv: PUtf8Char; aOptions: TDocVariantOptions;
       NameValueSep: AnsiChar = '='; ItemSep: AnsiChar = #10;
       DoTrim: boolean = true); overload;
@@ -1230,54 +1763,90 @@ type
     // !  Doc.InitObject(['name','John','year',1972]);
     // !end;
     // - will check the VType, and call ClearFast private method
+    /// 当先前的 Init*() 已在同一实例上执行时，在任何 Init*() 方法调用之前调用，以避免内存泄漏
+     // - 例如：
+     // !var
+     // !  Doc: TDocVariantData; // stack-allocated variable
+     // !begin
+     // !  Doc.InitArray(['one',2,3.0]); // no need of any Doc.Clear here
+     // !  assert(Doc.Count=3);
+     // !  Doc.Clear; // to release memory before following InitObject()
+     // !  Doc.InitObject(['name','John','year',1972]);
+     // !end;
+     // - 将检查 VType，并调用 ClearFast 私有方法
     procedure Clear;
     /// delete all internal stored values
     // - like Clear + Init() with the same options
     // - will reset Kind to dvUndefined
+    /// 删除所有内部存储的值
+     // - 像 Clear + Init() 一样具有相同的选项
+     // - 将 Kind 重置为 dvUndefine
     procedure Reset;
     /// fill all Values[] with #0, then delete all values
     // - could be used to specifically remove sensitive information from memory
+    /// 用#0填充所有Values[]，然后删除所有值
+     // - 可用于专门从内存中删除敏感信息
     procedure FillZero;
     /// check if the Document is an object - i.e. Kind = dvObject
+    /// 检查 Document 是否是一个对象 - 即 Kind = dvObject
     function IsObject: boolean;
       {$ifdef HASINLINE} inline; {$endif}
     /// check if the Document is an array - i.e. Kind = dvArray
+    /// 检查 Document 是否是数组 - 即 Kind = dvArray
     function IsArray: boolean;
       {$ifdef HASINLINE} inline; {$endif}
     /// check if names lookups are case sensitive in this object Document
+    /// 检查此对象文档中的名称查找是否区分大小写
     function IsCaseSensitive: boolean;
       {$ifdef HASINLINE} inline; {$endif}
     /// guess the TDocVariantModel corresponding to the current document Options
     // - returns true if model has been found and set
     // - returns false if no JSON_[] matches the current options
+    /// 猜测当前文档Options对应的TDocVariantModel
+     // - 如果已找到并设置模型，则返回 true
+     // - 如果没有 JSON_[] 与当前选项匹配，则返回 false
     function GetModel(out model: TDocVariantModel): boolean;
     /// low-level method to force a number of items
     // - could be used to fast add items to the internal Values[]/Names[] arrays
     // - just set protected VCount field, do not resize the arrays: caller
     // should ensure that Capacity is big enough
+    /// 强制多个项目的低级方法
+     // - 可用于快速将项目添加到内部 Values[]/Names[] 数组
+     // - 只需设置受保护的 VCount 字段，不要调整数组大小：调用者应确保容量足够大
     procedure SetCount(aCount: integer);
       {$ifdef HASINLINE}inline;{$endif}
     /// efficient comparison of two TDocVariantData content
     // - will return the same result than JSON comparison, but more efficiently
+    /// 高效比较两个TDocVariantData内容
+     // - 将返回与 JSON 比较相同的结果，但效率更高
     function Compare(const Another: TDocVariantData;
       CaseInsensitive: boolean = false): integer; overload;
     /// efficient comparison of two TDocVariantData objects
     // - will always ensure that both this instance and Another are Objects
     // - will compare all values following the supplied Fields order
     // - if no Fields is specified, will fallback to regular Compare()
+    /// 两个 TDocVariantData 对象的高效比较
+     // - 将始终确保此实例和另一个实例都是对象
+     // - 将比较遵循提供的字段顺序的所有值
+     // - 如果未指定任何字段，将回退到常规 Compare()
     function CompareObject(const ObjFields: array of RawUtf8;
       const Another: TDocVariantData; CaseInsensitive: boolean = false): integer;
     /// efficient equality comparison of two TDocVariantData content
     // - just a wrapper around Compare(Another)=0
+    /// 两个TDocVariantData内容的高效相等比较
+     // - 只是 Compare(Another)=0 的包装
     function Equals(const Another: TDocVariantData;
       CaseInsensitive: boolean = false): boolean; overload;
       {$ifdef HASSAFEINLINE}inline;{$endif}
     /// compare a TTDocVariantData object property with a given value
     // - returns -1 if this instance is not a dvObject or has no aName property
+    /// 将 TTDocVariantData 对象属性与给定值进行比较
+     // - 如果此实例不是 dvObject 或没有 aName 属性，则返回 -1
     function Compare(const aName: RawUtf8; const aValue: variant;
       aCaseInsensitive: boolean = false): integer; overload;
       {$ifdef ISDELPHI}{$ifdef HASINLINE}inline;{$endif}{$endif}
     /// efficient equality comparison a TTDocVariantData object property
+    /// 高效相等比较 TTDocVariantData 对象属性
     function Equals(const aName: RawUtf8; const aValue: variant;
       aCaseInsensitive: boolean = false): boolean; overload;
       {$ifdef ISDELPHI}{$ifdef HASINLINE}inline;{$endif}{$endif}
@@ -1290,11 +1859,27 @@ type
     // - you can specify an optional aIndex value to Insert instead of Add
     // - warning: FPC optimizer is confused by Values[InternalAdd(name)] so
     // you should call InternalAdd() in an explicit previous step
+    /// 内部调用低级方法为新值保留位置
+     // - 返回 Values[]/Names[] 数组中新创建项目的索引
+     // - 您不必使用它，除非您想直接在 Values[]/Names[] 数组中添加一些项目，例如使用 InitFast(InitialCapacity) 初始化文档
+     // - 如果 aName=''，则附加一个 dvArray 项，否则附加一个 dvObject 字段
+     // - 您可以指定一个可选的 aIndex 值来插入而不是添加
+     // - 警告：FPC 优化器被 Values[InternalAdd(name)] 混淆，因此您应该在显式的上一步中调用 InternalAdd()
     function InternalAdd(const aName: RawUtf8; aIndex: integer = -1): integer; overload;
     {$ifdef HASITERATORS}
     /// an enumerator able to compile "for .. in dv do" statements
     // - returns pointers over all Names[] and Values[]
     // - warning: if the document is an array, returned Name is nil:
+    // ! var e: TDocVariantFields;
+    // ! ...
+    // !    dv.InitArray([1, 3, 3, 4]);
+    // !    for e in dv do
+    // !      // here e.Name = nil
+    // !      writeln(e.Value^);
+    // ! // output  1  2  3  4
+    /// 能够编译“for .. in dv do”语句的枚举器
+     // - 返回所有 Names[] 和 Values[] 上的指针
+     // - 警告：如果文档是数组，则返回的 Name 为 nil：
     // ! var e: TDocVariantFields;
     // ! ...
     // !    dv.InitArray([1, 3, 3, 4]);
@@ -1312,10 +1897,28 @@ type
     // !   for e in dv.Fields do
     // !     writeln(e.Name^, ':', e.Value^);
     // ! // output  a:1  b:2  c:3
+    /// 能够为对象编译“for .. in dv.Fields do”的枚举器
+     // - 返回所有 Names[] 和 Values[] 上的指针
+     // - 如果文档是数组，则不要迭代 - 所以 Name 永远不会为零：
+    // ! var e: TDocVariantFields;
+    // ! ...
+    // !   dv.InitJson('{a:1,b:2,c:3}');
+    // !   for e in dv.Fields do
+    // !     writeln(e.Name^, ':', e.Value^);
+    // ! // output  a:1  b:2  c:3
     function Fields: TDocVariantFieldsEnumerator;
     /// an enumerator able to compile "for .. in dv.FieldNames do" for objects
     // - returns pointers over all Names[]
     // - don't iterate if the document is an array - so n is never nil:
+    // ! var n: PRawUtf8;
+    // ! ...
+    // !   dv.InitJson('{a:1,b:2,c:3}');
+    // !   for n in dv.FieldNames do
+    // !     writeln(n^);
+    // ! // output  a  b  c
+    /// 能够为对象编译“for .. in dv.FieldNames do”的枚举器
+     // - 返回所有 Names[] 上的指针
+     // - 如果文档是数组，则不要迭代 - 因此 n 永远不会为零：
     // ! var n: PRawUtf8;
     // ! ...
     // !   dv.InitJson('{a:1,b:2,c:3}');
@@ -1332,11 +1935,30 @@ type
     // !   for v in dv.FieldValues do
     // !     writeln(v^);
     // ! // output  1  2  3
+    /// 能够为对象编译“for .. in dv.FieldValues do”的枚举器
+     // - 返回所有 Values[] 上的指针
+     // - 如果文档是数组，则不要迭代：
+    // ! var v: PVariant;
+    // ! ...
+    // !   dv.InitJson('{a:1,b:2,c:3}');
+    // !   for v in dv.FieldValues do
+    // !     writeln(v^);
+    // ! // output  1  2  3
     function FieldValues: TDocVariantItemsEnumerator;
     /// an enumerator able to compile "for .. in dv.Items do" for arrays
     // - returns a PVariant over all Values[] of a document array
     // - don't iterate if the document is an object
     // - for instance:
+    // ! var v: PVariant;
+    // ! ...
+    // !    dv.InitArray([1, 3, 3, 4]);
+    // !    for v in dv.Items do
+    // !      writeln(v^);
+    // ! // output  1  2  3  4
+    /// 能够为数组编译“for .. in dv.Items do”的枚举器
+     // - 返回文档数组的所有 Values[] 上的 PVariant
+     // - 如果文档是对象，则不迭代
+     // - 例如：
     // ! var v: PVariant;
     // ! ...
     // !    dv.InitArray([1, 3, 3, 4]);
@@ -1355,6 +1977,16 @@ type
     // !      writeln(d^.ToJson);
     // ! // output {"a":1,"b":1} and {"a":2,"b":2} only
     // ! // (ignoring 1 and "no object" items)
+    /// 能够为对象数组编译“for .. dv.Objects do”的枚举器
+     // - 返回文档数组中作为 TDocVariantData 的所有 Values[]
+     // - 如果文档是对象，或者项目不是 TDocVariantData，则不要迭代：
+    // ! var d: PDocVariantData;
+    // ! ...
+    // !    dv.InitJson('[{a:1,b:1},1,"no object",{a:2,b:2}]');
+    // !    for d in dv.Objects do
+    // !      writeln(d^.ToJson);
+    // ! // output {"a":1,"b":1} and {"a":2,"b":2} only
+    // ! // (ignoring 1 and "no object" items)
     function Objects: TDocVariantObjectsEnumerator;
     {$endif HASITERATORS}
 
@@ -1363,12 +1995,19 @@ type
     // layout of this instance (i.e. Kind property value)
     // - will write  'null'  if Kind is dvUndefined
     // - implemented as just a wrapper around DocVariantType.ToJson()
+    /// 将文档保存为 UTF-8 编码的 JSON
+     // - 将写入 JSON 对象或数组，具体取决于此实例的内部布局（即 Kind 属性值）
+     // - 如果 Kind 为 dvUndefined，则写入“null”
+     // - 作为 DocVariantType.ToJson() 的包装器实现
     function ToJson: RawUtf8; overload;
     /// save a document as UTF-8 encoded JSON
+    /// 将文档保存为 UTF-8 编码的 JSON
     function ToJson(const Prefix, Suffix: RawUtf8;
       Format: TTextWriterJsonFormat): RawUtf8; overload;
     /// save a document as UTF-8 encoded JSON file
     // - you may then use InitJsonFromFile() to load and parse this file
+    /// 将文档保存为UTF-8编码的JSON文件
+     // - 然后您可以使用 InitJsonFromFile() 加载并解析该文件
     procedure SaveToJsonFile(const FileName: TFileName);
     /// save an array of objects as UTF-8 encoded non expanded layout JSON
     // - returned content would be a JSON object in mORMot's TOrmTableJson non
@@ -1378,18 +2017,30 @@ type
     // - will raise an exception if the array document is not an array of
     // objects with identical field names
     // - can be unserialized using the InitArrayFromResults() method
+    /// 将对象数组保存为 UTF-8 编码的非扩展布局 JSON
+     // - 返回的内容将是 mORMot 的 TOrmTableJson 非扩展格式的 JSON 对象，并减少 JSON 大小，即
+     // $ {"fieldCount":2,"values":["f1","f2","1v1",1v2,"2v1",2v2...],"rowCount":20}
+     // - 如果 Kind 是 dvUndefined 或 dvObject，则会写入 ''
+     // - 如果数组文档不是具有相同字段名称的对象数组，则会引发异常
+     // - 可以使用 InitArrayFromResults() 方法反序列化
     function ToNonExpandedJson: RawUtf8;
     /// save a document as an array of UTF-8 encoded JSON
     // - will expect the document to be a dvArray - otherwise, will raise a
     // EDocVariant exception
     // - will use VariantToUtf8() to populate the result array: as a consequence,
     // any nested custom variant types (e.g. TDocVariant) will be stored as JSON
+    /// 将文档保存为UTF-8编码的JSON数组
+     // - 期望文档是 dvArray - 否则，将引发 EDocVariant 异常
+     // - 将使用 VariantToUtf8() 填充结果数组：因此，任何嵌套的自定义变体类型（例如 TDocVariant）都将存储为 JSON
     procedure ToRawUtf8DynArray(out Result: TRawUtf8DynArray); overload;
     /// save a document as an array of UTF-8 encoded JSON
     // - will expect the document to be a dvArray - otherwise, will raise a
     // EDocVariant exception
     // - will use VariantToUtf8() to populate the result array: as a consequence,
     // any nested custom variant types (e.g. TDocVariant) will be stored as JSON
+    /// 将文档保存为UTF-8编码的JSON数组
+     // - 期望文档是 dvArray - 否则，将引发 EDocVariant 异常
+     // - 将使用 VariantToUtf8() 填充结果数组：因此，任何嵌套的自定义变体类型（例如 TDocVariant）都将存储为 JSON
     function ToRawUtf8DynArray: TRawUtf8DynArray; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// save a document as an CSV of UTF-8 encoded JSON
@@ -1397,16 +2048,23 @@ type
     // EDocVariant exception
     // - will use VariantToUtf8() to populate the result array: as a consequence,
     // any nested custom variant types (e.g. TDocVariant) will be stored as JSON
+    /// 将文档保存为 UTF-8 编码 JSON 的 CSV
+     // - 期望文档是 dvArray - 否则，将引发 EDocVariant 异常
+     // - 将使用 VariantToUtf8() 填充结果数组：因此，任何嵌套的自定义变体类型（例如 TDocVariant）都将存储为 JSON
     function ToCsv(const Separator: RawUtf8 = ','): RawUtf8;
     /// save a document as UTF-8 encoded Name=Value pairs
     // - will follow by default the .INI format, but you can specify your
     // own expected layout
+    /// 将文档保存为 UTF-8 编码的名称=值对
+     // - 默认情况下将遵循 .INI 格式，但您可以指定自己的预期布局
     procedure ToTextPairsVar(out result: RawUtf8;
       const NameValueSep: RawUtf8 = '='; const ItemSep: RawUtf8 = #13#10;
       Escape: TTextWriterKind = twJsonEscape);
     /// save a document as UTF-8 encoded Name=Value pairs
     // - will follow by default the .INI format, but you can specify your
     // own expected layout
+    /// 将文档保存为 UTF-8 编码的名称=值对
+     // - 默认情况下将遵循 .INI 格式，但您可以指定自己的预期布局
     function ToTextPairs(const NameValueSep: RawUtf8 = '=';
       const ItemSep: RawUtf8 = #13#10;
       Escape: TTextWriterKind = twJsonEscape): RawUtf8;
@@ -1416,6 +2074,16 @@ type
     // EDocVariant exception
     // - values will be passed by referenced as vtVariant to @VValue[ndx]
     // - would allow to write code as such:
+    // !  Doc.InitArray(['one',2,3]);
+    // !  Doc.ToArrayOfConst(vr);
+    // !  s := FormatUtf8('[%,%,%]',vr,[],true);
+    // !  // here s='[one,2,3]') since % would be replaced by Args[] parameters
+    // !  s := FormatUtf8('[?,?,?]',[],vr,true);
+    // !  // here s='["one",2,3]') since ? would be escaped by Params[] parameters
+    /// 将数组文档保存为 TVarRec 数组，即 const 数组
+     // - 期望文档是 dvArray - 否则，将引发 EDocVariant 异常
+     // - 值将通过引用为 vtVariant 传递给 @VValue[ndx]
+     // - 允许编写这样的代码：
     // !  Doc.InitArray(['one',2,3]);
     // !  Doc.ToArrayOfConst(vr);
     // !  s := FormatUtf8('[%,%,%]',vr,[],true);
@@ -1433,14 +2101,26 @@ type
     // !  // here s='[one,2,3]') since % would be replaced by Args[] parameters
     // !  s := FormatUtf8('[?,?,?]',[],Doc.ToArrayOfConst,true);
     // !  // here s='["one",2,3]') since ? would be escaped by Params[] parameters
+    /// 将数组文档保存为 TVarRec 数组，即 const 数组
+     // - 期望文档是 dvArray - 否则，将引发 EDocVariant 异常
+     // - 值将通过引用为 vtVariant 传递给 @VValue[ndx]
+     // - 允许编写这样的代码：
+    // !  Doc.InitArray(['one',2,3]);
+    // !  s := FormatUtf8('[%,%,%]',Doc.ToArrayOfConst,[],true);
+    // !  // here s='[one,2,3]') since % would be replaced by Args[] parameters
+    // !  s := FormatUtf8('[?,?,?]',[],Doc.ToArrayOfConst,true);
+    // !  // here s='["one",2,3]') since ? would be escaped by Params[] parameters
     function ToArrayOfConst: TTVarRecDynArray; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// save an object document as an URI-encoded list of parameters
     // - object field names should be plain ASCII-7 RFC compatible identifiers
     // (0..9a..zA..Z_.~), otherwise their values are skipped
+    /// 将对象文档保存为 URI 编码的参数列表
+     // - 对象字段名称应该是纯 ASCII-7 RFC 兼容标识符 (0..9a..zA..Z_.~)，否则它们的值将被跳过
     function ToUrlEncode(const UriRoot: RawUtf8): RawUtf8;
 
     /// returns true if this is not a true TDocVariant, or Count equals 0
+    /// 如果这不是一个真正的 TDocVariant，或者 Count 等于 0，则返回 true
     function IsVoid: boolean;
       {$ifdef HASINLINE}inline;{$endif}
     /// find an item index in this document from its name
@@ -1448,47 +2128,73 @@ type
     // - lookup the value by name for an object document, or accept an integer
     // text as index for an array document
     // - returns -1 if not found
+    /// 根据名称查找该文档中的项目索引
+     // - 搜索将遵循本文档的 dvoNameCaseSensitive 选项
+     // - 按对象文档的名称查找值，或接受整数文本作为数组文档的索引
+     // - 如果没有找到则返回-1
     function GetValueIndex(const aName: RawUtf8): integer; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// find an item index in this document from its name
     // - lookup the value by name for an object document, or accept an integer
     // text as index for an array document
     // - returns -1 if not found
+    /// 根据名称查找该文档中的项目索引
+     // - 按对象文档的名称查找值，或接受整数文本作为数组文档的索引
+     // - 如果没有找到则返回-1
     function GetValueIndex(aName: PUtf8Char; aNameLen: PtrInt;
       aCaseSensitive: boolean): integer; overload;
     /// find an item in this document, and returns its value
     // - raise an EDocVariant if not found and dvoReturnNullForUnknownProperty
     // is not set in Options (in this case, it will return Null)
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果未找到且选项中未设置 dvoReturnNullForUnknownProperty，则引发 EDocVariant（在这种情况下，它将返回 Null）
     function GetValueOrRaiseException(const aName: RawUtf8): variant;
     /// find an item in this document, and returns its value
     // - return the supplied default if aName is not found, or if the instance
     // is not a TDocVariant
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回提供的默认值
     function GetValueOrDefault(const aName: RawUtf8;
       const aDefault: variant): variant;
     /// find an item in this document, and returns its value
     // - return null if aName is not found, or if the instance is not a TDocVariant
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 null
     function GetValueOrNull(const aName: RawUtf8): variant;
     /// find an item in this document, and returns its value
     // - return a cleared variant if aName is not found, or if the instance is
     // not a TDocVariant
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回已清除的变体
     function GetValueOrEmpty(const aName: RawUtf8): variant;
     /// find an item in this document, and returns its value as enumerate
     // - return false if aName is not found, if the instance is not a TDocVariant,
     // or if the value is not a string corresponding to the supplied enumerate
     // - return true if the name has been found, and aValue stores the value
     // - will call Delete() on the found entry, if aDeleteFoundEntry is true
+    /// 在此文档中查找一个项目，并以枚举形式返回其值
+     // - 如果未找到 aName、实例不是 TDocVariant、或者值不是与提供的枚举相对应的字符串，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 如果 aDeleteFoundEntry 为 true，将对找到的条目调用 Delete()
     function GetValueEnumerate(const aName: RawUtf8; aTypeInfo: PRttiInfo;
       out aValue; aDeleteFoundEntry: boolean = false): boolean;
     /// returns a JSON object containing all properties matching the
     // first characters of the supplied property name
     // - returns null if the document is not a dvObject
     // - will use IdemPChar(), so search would be case-insensitive
+    /// 返回一个 JSON 对象，其中包含与所提供属性名称的第一个字符匹配的所有属性
+     // - 如果文档不是 dvObject，则返回 null
+     // - 将使用 IdemPChar()，因此搜索不区分大小写
     function GetJsonByStartName(const aStartName: RawUtf8): RawUtf8;
     /// find an item in this document, and returns its value as TVarData
     // - return false if aName is not found, or if the instance is not a TDocVariant
     // - return true and set aValue if the name has been found
     // - will use simple loop lookup to identify the name, unless aSortedCompare is
     // set, and would let use a faster O(log(n)) binary search after a SortByName()
+    /// 在此文档中查找一个项目，并将其值作为 TVarData 返回
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称，则返回 true 并设置 aValue
+     // - 将使用简单循环查找来识别名称，除非设置了 aSortedCompare，并且将在 SortByName() 之后使用更快的 O(log(n)) 二分搜索
     function GetVarData(const aName: RawUtf8; var aValue: TVarData;
       aSortedCompare: TUtf8Compare = nil): boolean; overload;
       {$ifdef HASINLINE}inline;{$endif}
@@ -1497,6 +2203,10 @@ type
     // - return a pointer to the value if the name has been found, and optionally
     // fill aFoundIndex^ with its index in Values[]
     // - after a SortByName(aSortedCompare), could use faster binary search
+    /// 在此文档中查找一项，并将其值作为 TVarData 指针返回
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 nil
+     // - 如果已找到名称，则返回指向该值的指针，并可选择使用其在 Values[] 中的索引填充 aFoundIndex^
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
     function GetVarData(const aName: RawUtf8; aSortedCompare: TUtf8Compare = nil;
       aFoundIndex: PInteger = nil): PVarData; overload;
     /// find an item in this document, and returns its value as boolean
@@ -1504,6 +2214,11 @@ type
     // - return true if the name has been found, and aValue stores the value
     // - after a SortByName(aSortedCompare), could use faster binary search
     // - consider using B[] property if you want simple read/write typed access
+    /// 在此文档中查找一个项目，并将其值返回为布尔值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的读/写类型访问，请考虑使用 B[] 属性
     function GetAsBoolean(const aName: RawUtf8; out aValue: boolean;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as integer
@@ -1511,6 +2226,11 @@ type
     // - return true if the name has been found, and aValue stores the value
     // - after a SortByName(aSortedCompare), could use faster binary search
     // - consider using I[] property if you want simple read/write typed access
+    /// 在此文档中查找一个项目，并以整数形式返回其值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的读/写类型访问，请考虑使用 I[] 属性
     function GetAsInteger(const aName: RawUtf8; out aValue: integer;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as integer
@@ -1518,6 +2238,11 @@ type
     // - return true if the name has been found, and aValue stores the value
     // - after a SortByName(aSortedCompare), could use faster binary search
     // - consider using I[] property if you want simple read/write typed access
+    /// 在此文档中查找一个项目，并以整数形式返回其值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的读/写类型访问，请考虑使用 I[] 属性
     function GetAsInt64(const aName: RawUtf8; out aValue: Int64;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as floating point
@@ -1525,6 +2250,11 @@ type
     // - return true if the name has been found, and aValue stores the value
     // - after a SortByName(aSortedCompare), could use faster binary search
     // - consider using D[] property if you want simple read/write typed access
+    /// 在此文档中查找一项，并以浮点形式返回其值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的读/写类型访问，请考虑使用 D[] 属性
     function GetAsDouble(const aName: RawUtf8; out aValue: double;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as RawUtf8
@@ -1532,6 +2262,11 @@ type
     // - return true if the name has been found, and aValue stores the value
     // - after a SortByName(aSortedCompare), could use faster binary search
     // - consider using U[] property if you want simple read/write typed access
+    /// 在此文档中查找一项，并以 RawUtf8 形式返回其值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称且 aValue 存储该值，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的读/写类型访问，请考虑使用 U[] 属性
     function GetAsRawUtf8(const aName: RawUtf8; out aValue: RawUtf8;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as a TDocVariantData
@@ -1539,18 +2274,30 @@ type
     // - return true if the name has been found and points to a TDocVariant:
     // then aValue stores a pointer to the value
     // - after a SortByName(aSortedCompare), could use faster binary search
+    /// 在此文档中查找一个项目，并以 TDocVariantData 形式返回其值
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 false
+     // - 如果已找到名称并指向 TDocVariant，则返回 true：然后 aValue 存储指向该值的指针
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
     function GetAsDocVariant(const aName: RawUtf8; out aValue: PDocVariantData;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find a non-void array item in this document, and returns its value
     // - return false if aName is not found, or if not a TDocVariant array
     // - return true if the name was found as non-void array and set to aArray
     // - after a SortByName(aSortedCompare), could use faster binary search
+    /// 在本文档中查找非void数组项，并返回其值
+     // - 如果未找到 aName，或者不是 TDocVariant 数组，则返回 false
+     // - 如果发现名称为非 void 数组并设置为 aArray，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
     function GetAsArray(const aName: RawUtf8; out aArray: PDocVariantData;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find a non-void object item in this document, and returns its value
     // - return false if aName is not found, or if not a TDocVariant object
     // - return true if the name was found as non-void object and set to aObject
     // - after a SortByName(aSortedCompare), could use faster binary search
+    /// 在这个文档中找到一个非void对象项，并返回它的值
+     // - 如果未找到 aName，或者不是 TDocVariant 对象，则返回 false
+     // - 如果名称被发现为非 void 对象并设置为 aObject，则返回 true
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
     function GetAsObject(const aName: RawUtf8; out aObject: PDocVariantData;
       aSortedCompare: TUtf8Compare = nil): boolean;
     /// find an item in this document, and returns its value as a TDocVariantData
@@ -1559,6 +2306,10 @@ type
     // - consider using O[] or A[] properties if you want simple read-only
     // access, or O_[] or A_[] properties if you want the ability to add
     // a missing object or array in the document
+    /// 在此文档中查找一个项目，并以 TDocVariantData 形式返回其值
+     // - 如果 aName 不是文档，则返回 void TDocVariant
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
+     // - 如果您想要简单的只读访问，请考虑使用 O[] 或 A[] 属性；如果您希望能够在文档中添加缺少的对象或数组，请考虑使用 O_[] 或 A_[] 属性
     function GetAsDocVariantSafe(const aName: RawUtf8;
       aSortedCompare: TUtf8Compare = nil): PDocVariantData;
     /// find an item in this document, and returns pointer to its value
@@ -1566,6 +2317,10 @@ type
     // - return true if the name has been found: then aValue stores a pointer
     // to the value
     // - after a SortByName(aSortedCompare), could use faster binary search
+    /// 在此文档中查找一项，并返回指向其值的指针
+     // - 如果未找到 aName，则返回 false
+     // - 如果已找到名称，则返回 true：然后 aValue 存储指向该值的指针
+     // - 在 SortByName(aSortedCompare) 之后，可以使用更快的二分搜索
     function GetAsPVariant(const aName: RawUtf8; out aValue: PVariant;
       aSortedCompare: TUtf8Compare = nil): boolean; overload;
        {$ifdef HASINLINE}inline;{$endif}
@@ -1574,6 +2329,11 @@ type
     // an integer text as index for an array document
     // - return nil if aName is not found, or if the instance is not a TDocVariant
     // - return a pointer to the stored variant, if the name has been found
+    /// 在此文档中查找一项，并返回指向其值的指针
+     // - 通过 aName/aNameLen 查找对象文档的值，或接受
+     // 整数文本作为数组文档的索引
+     // - 如果未找到 aName，或者实例不是 TDocVariant，则返回 nil
+     // - 如果已找到名称，则返回指向存储变体的指针
     function GetAsPVariant(aName: PUtf8Char; aNameLen: PtrInt): PVariant; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// retrieve a value, given its path
@@ -1581,6 +2341,11 @@ type
     // - it will return Unassigned if there is no item at the supplied aPath
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
     // - see also the P[] property if the default aPathDelim = '.' is enough
+    /// 检索一个值，给定其路径
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - 如果提供的 aPath 中没有项目，它将返回 Unassigned
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
+     // - 如果默认 aPathDelim = '.'，另请参阅 P[] 属性 足够
     function GetValueByPath(
       const aPath: RawUtf8; aPathDelim: AnsiChar = '.'): variant; overload;
     /// retrieve a value, given its path
@@ -1589,6 +2354,12 @@ type
     // - returns TRUE and set the found value in aValue
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
     // - see also the P[] property if the default aPathDelim = '.' is enough
+    /// 检索一个值，给定其路径
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - 如果提供的 aPath 处没有项目，则返回 FALSE
+     // - 返回 TRUE 并将找到的值设置在 aValue 中
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
+     // - 如果默认 aPathDelim = '.'，另请参阅 P[] 属性 足够
     function GetValueByPath(const aPath: RawUtf8; out aValue: variant;
       aPathDelim: AnsiChar = '.'): boolean; overload;
     /// retrieve a value, given its path
@@ -1597,6 +2368,10 @@ type
     // - this method will only handle nested TDocVariant values: use the
     // slightly slower GetValueByPath() overloaded method, if any nested object
     // may be of another type (e.g. a TBsonVariant)
+    /// 检索一个值，给定其路径
+     // - 路径被定义为名称列表，例如 ['文档'，'术语表'，'标题']
+     // - 如果提供的 aPath 处没有项目，则返回 Unassigned
+     // - 此方法将仅处理嵌套的 TDocVariant 值：如果任何嵌套对象可能是其他类型（例如 TBsonVariant），请使用稍慢的 GetValueByPath() 重载方法
     function GetValueByPath(
       const aDocVariantPath: array of RawUtf8): variant; overload;
     /// retrieve a reference to a value, given its path
@@ -1604,6 +2379,11 @@ type
     // - if the supplied aPath does not match any object, it will return nil
     // - if aPath is found, returns a pointer to the corresponding value
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
+    /// 在给定路径的情况下检索对值的引用
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - 如果提供的 aPath 与任何对象都不匹配，它将返回 nil
+     // - 如果找到aPath，则返回指向相应值的指针
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
     function GetPVariantByPath(
       const aPath: RawUtf8; aPathDelim: AnsiChar = '.'): PVariant;
     /// retrieve a reference to a TDocVariant, given its path
@@ -1611,6 +2391,11 @@ type
     // - if the supplied aPath does not match any object, it will return false
     // - if aPath stores a valid TDocVariant, returns true and a pointer to it
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
+    /// 在给定路径的情况下检索对 TDocVariant 的引用
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - 如果提供的 aPath 与任何对象都不匹配，它将返回 false
+     // - 如果 aPath 存储有效的 TDocVariant，则返回 true 和指向它的指针
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
     function GetDocVariantByPath(const aPath: RawUtf8;
       out aValue: PDocVariantData; aPathDelim: AnsiChar = '.'): boolean;
     /// retrieve a dvObject in the dvArray, from a property value
@@ -1619,6 +2404,11 @@ type
     // - returns FALSE if no match is found, TRUE if found and copied
     // - create a copy of the variant by default, unless DestByRef is TRUE
     // - will call VariantEquals() for value comparison
+    /// 从属性值中检索 dvArray 中的 dvObject
+     // - {aPropName:aPropValue} 将在存储的数组中搜索，匹配时相应的项将被复制到 Dest 中
+     // - 如果未找到匹配则返回 FALSE，如果找到并复制则返回 TRUE
+     // - 默认情况下创建变体的副本，除非 DestByRef 为 TRUE
+     // - 将调用 VariantEquals() 进行值比较
     function GetItemByProp(const aPropName, aPropValue: RawUtf8;
       aPropValueCaseSensitive: boolean; var Dest: variant;
       DestByRef: boolean = false): boolean;
@@ -1626,32 +2416,48 @@ type
     // - {aPropName:aPropValue} will be searched within the stored array,
     // and the corresponding item will be copied into Dest, on match
     // - returns FALSE if no match is found, TRUE if found and copied by reference
+    /// 从属性值中检索 dvArray 中 dvObject 的引用
+     // - {aPropName:aPropValue} 将在存储的数组中搜索，匹配时相应的项将被复制到 Dest 中
+     // - 如果未找到匹配项，则返回 FALSE；如果找到匹配项并通过引用复制，则返回 TRUE
     function GetDocVariantByProp(const aPropName, aPropValue: RawUtf8;
       aPropValueCaseSensitive: boolean; out Dest: PDocVariantData): boolean;
     /// find an item in this document, and returns its value
     // - raise an EDocVariant if not found and dvoReturnNullForUnknownProperty
     // is not set in Options (in this case, it will return Null)
     // - create a copy of the variant by default, unless DestByRef is TRUE
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果未找到且选项中未设置 dvoReturnNullForUnknownProperty，则引发 EDocVariant（在这种情况下，它将返回 Null）
+     // - 默认情况下创建变体的副本，除非 DestByRef 为 TRUE
     function RetrieveValueOrRaiseException(aName: PUtf8Char; aNameLen: integer;
       aCaseSensitive: boolean; var Dest: variant; DestByRef: boolean): boolean; overload;
     /// retrieve an item in this document from its index, and returns its value
     // - raise an EDocVariant if the supplied Index is not in the 0..Count-1
     // range and dvoReturnNullForUnknownProperty is set in Options
     // - create a copy of the variant by default, unless DestByRef is TRUE
+    /// 从其索引中检索此文档中的项目，并返回其值
+     // - 如果提供的索引不在 0..Count-1 范围内并且在选项中设置了 dvoReturnNullForUnknownProperty，则引发 EDocVariant
+     // - 默认情况下创建变体的副本，除非 DestByRef 为 TRUE
     procedure RetrieveValueOrRaiseException(Index: integer;
      var Dest: variant; DestByRef: boolean); overload;
     /// retrieve an item in this document from its index, and returns its Name
     // - raise an EDocVariant if the supplied Index is not in the 0..Count-1
     // range and dvoReturnNullForUnknownProperty is set in Options
+    /// 从其索引中检索此文档中的项目，并返回其名称
+     // - 如果提供的索引不在 0..Count-1 范围内并且在选项中设置了 dvoReturnNullForUnknownProperty，则引发 EDocVariant
     procedure RetrieveNameOrRaiseException(Index: integer; var Dest: RawUtf8);
     /// returns a TDocVariant object containing all properties matching the
     // first characters of the supplied property name
     // - returns null if the document is not a dvObject
     // - will use IdemPChar(), so search would be case-insensitive
+    /// 返回一个 TDocVariant 对象，其中包含与所提供属性名称的第一个字符匹配的所有属性
+     // - 如果文档不是 dvObject，则返回 null
+     // - 将使用 IdemPChar()，因此搜索不区分大小写
     function GetValuesByStartName(const aStartName: RawUtf8;
       TrimLeftStartName: boolean = false): variant;
     /// set an item in this document from its index
     // - raise an EDocVariant if the supplied Index is not in 0..Count-1 range
+    /// 从文档的索引中设置一个项目
+     // - 如果提供的索引不在 0..Count-1 范围内，则引发 EDocVariant
     procedure SetValueOrRaiseException(Index: integer; const NewValue: variant);
     /// set a value, given its path
     // - path is defined as a dotted name-space, e.g. 'doc.glossary.title'
@@ -1659,6 +2465,12 @@ type
     // - returns FALSE if there is no item to be set at the supplied aPath
     // - returns TRUE and set the found value in aValue
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
+    /// 设置一个值，给定其路径
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - aCreateIfNotExisting=true 将强制创建缺失的嵌套对象
+     // - 如果在提供的 aPath 处没有要设置的项目，则返回 FALSE
+     // - 返回 TRUE 并将找到的值设置在 aValue 中
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
     function SetValueByPath(const aPath: RawUtf8; const aValue: variant;
       aCreateIfNotExisting: boolean = false; aPathDelim: AnsiChar = '.'): boolean;
 
@@ -1678,10 +2490,23 @@ type
     // ! Assert(TDocVariantData(aVariant).Kind=dvObject);
     // - you can specify an optional index in the array where to insert
     // - returns the index of the corresponding newly added value
+    /// 在此文档中添加一个值
+     // - 如果设置了 aName，如果设置了 dvoCheckForDuplicatedNames 选项，则任何现有的重复 aName 将引发 EDocVariant； 如果实例的种类是 dvArray 并且定义了 aName，它将引发一个 EDocVariant
+     // - aName 可能是 '' 例如 如果要存储数组：在这种情况下，不应设置 dvoCheckForDuplicatedNames 选项； 如果实例的 Kind 是 dvObject，它将引发 EDocVariant 异常
+     // - 如果 aValueOwned 为 true，则提供的 aValue 将被分配给内部值 - 默认情况下，它将使用 SetVariantByValue()
+     // - 因此你可以写例如：
+    // ! TDocVariant.New(aVariant);
+    // ! Assert(TDocVariantData(aVariant).Kind=dvUndefined);
+    // ! TDocVariantData(aVariant).AddValue('name','John');
+    // ! Assert(TDocVariantData(aVariant).Kind=dvObject);
+     // - 您可以指定数组中插入位置的可选索引
+     // - 返回对应新添加值的索引
     function AddValue(const aName: RawUtf8; const aValue: variant;
       aValueOwned: boolean = false; aIndex: integer = -1): integer; overload;
     /// add a value in this document
     // - overloaded function accepting a UTF-8 encoded buffer for the name
+    /// 在此文档中添加一个值
+     // - 接受 UTF-8 编码缓冲区作为名称的重载函数
     function AddValue(aName: PUtf8Char; aNameLen: integer; const aValue: variant;
       aValueOwned: boolean = false; aIndex: integer = -1): integer; overload;
     /// add a value in this document, or update an existing entry
@@ -1689,6 +2514,10 @@ type
     // - any existing Name would be updated with the new Value, unless
     // OnlyAddMissing is set to TRUE, in which case existing values would remain
     // - returns the index of the corresponding value, which may be just added
+    /// 在此文档中添加值，或更新现有条目
+     // - 如果实例的 Kind 是 dvArray，它将引发 EDocVariant 异常
+     // - 任何现有名称都将使用新值进行更新，除非 OnlyAddMissing 设置为 TRUE，在这种情况下现有值将保留
+     // - 返回对应值的索引，该值可能是刚刚添加的
     function AddOrUpdateValue(const aName: RawUtf8; const aValue: variant;
       wasAdded: PBoolean = nil; OnlyAddMissing: boolean = false): integer;
     /// add a value in this document, from its text representation
@@ -1696,6 +2525,9 @@ type
     // converted to a variant number, if possible (as varInt/varInt64/varCurrency
     // and/or as varDouble is AllowVarDouble is set)
     // - if Update=TRUE, will set the property, even if it is existing
+    /// 从文档的文本表示中添加一个值
+     // - 此函数需要一个 UTF-8 文本作为值，如果可能的话，该文本将被转换为变体数字（如 varInt/varInt64/varCurrency 和/或 varDouble 被设置为AllowVarDouble）
+     // - 如果 Update=TRUE，将设置该属性，即使它已存在
     function AddValueFromText(const aName, aValue: RawUtf8;
       DoUpdate: boolean = false; AllowVarDouble: boolean = false): integer;
     /// add some properties to a TDocVariantData dvObject
@@ -1703,14 +2535,23 @@ type
     // - caller should ensure that Kind=dvObject, otherwise it won't do anything
     // - any existing Name would be duplicated - use Update() if you want to
     // replace any existing value
+    /// 添加一些属性到 TDocVariantData dvObject
+     // - 数据以名称、值对的形式两两提供
+     // - 调用者应确保 Kind=dvObject，否则它不会执行任何操作
+     // - 任何现有名称都会重复 - 如果要替换任何现有值，请使用 Update()
     procedure AddNameValuesToObject(const NameValuePairs: array of const);
     /// merge some properties to a TDocVariantData dvObject
     // - data is supplied two by two, as Name,Value pairs
     // - caller should ensure that Kind=dvObject, otherwise it won't do anything
     // - any existing Name would be updated with the new Value
+    /// 将一些属性合并到 TDocVariantData dvObject
+     // - 数据以名称、值对的形式两两提供
+     // - 调用者应确保 Kind=dvObject，否则它不会执行任何操作
+     // - 任何现有名称都将更新为新值
     procedure Update(const NameValuePairs: array of const);
     {$ifndef PUREMORMOT2}
     /// deprecated method which redirects to Update()
+    /// 已弃用的重定向到 Update() 的方法
     procedure AddOrUpdateNameValuesToObject(const NameValuePairs: array of const);
     {$endif PUREMORMOT2}
     /// merge some TDocVariantData dvObject properties to a TDocVariantData dvObject
@@ -1719,6 +2560,10 @@ type
     // it won't do anything
     // - any existing Name would be updated with the new Value, unless
     // OnlyAddMissing is set to TRUE, in which case existing values would remain
+    /// 将一些 TDocVariantData dvObject 属性合并到 TDocVariantData dvObject
+     // - 数据以名称、值对的形式两两提供
+     // - 调用者应确保两个变体都有 Kind=dvObject，否则它不会执行任何操作
+     // - 任何现有名称都将使用新值进行更新，除非 OnlyAddMissing 设置为 TRUE，在这种情况下现有值将保留
     procedure AddOrUpdateObject(const NewValues: variant;
       OnlyAddMissing: boolean = false; RecursiveUpdate: boolean = false);
     /// add a value to this document, handled as array
@@ -1730,8 +2575,18 @@ type
     // ! Assert(TDocVariantData(aVariant).Kind=dvArray);
     // - you can specify an optional index in the array where to insert
     // - returns the index of the corresponding newly added item
+    /// 向该文档添加一个值，作为数组处理
+     // - 如果实例的 Kind 是 dvObject，它将引发 EDocVariant 异常
+     // - 因此你可以写例如：
+    // ! TDocVariant.New(aVariant);
+    // ! Assert(TDocVariantData(aVariant).Kind=dvUndefined);
+    // ! TDocVariantData(aVariant).AddItem('one');
+    // ! Assert(TDocVariantData(aVariant).Kind=dvArray);
+     // - 您可以指定数组中插入位置的可选索引
+     // - 返回对应新添加项的索引
     function AddItem(const aValue: variant; aIndex: integer = -1): integer; overload;
     /// add a TDocVariant value to this document, handled as array
+    /// 将 TDocVariant 值添加到此文档，作为数组处理
     function AddItem(const aValue: TDocVariantData; aIndex: integer = -1): integer; overload;
     /// add a value to this document, handled as array, from its text representation
     // - this function expects a UTF-8 text for the value, which would be
@@ -1740,21 +2595,37 @@ type
     // - if instance's Kind is dvObject, it will raise an EDocVariant exception
     // - you can specify an optional index in the array where to insert
     // - returns the index of the corresponding newly added item
+    /// 从文档的文本表示中添加一个值，作为数组处理
+     // - 此函数需要值的 UTF-8 文本，如果可能的话，该文本将转换为变体编号（如 varInt/varInt64/varCurrency，除非设置了 AllowVarDouble）
+     // - 如果实例的 Kind 是 dvObject，它将引发 EDocVariant 异常
+     // - 您可以指定数组中插入位置的可选索引
+     // - 返回对应新添加项的索引
     function AddItemFromText(const aValue: RawUtf8;
       AllowVarDouble: boolean = false; aIndex: integer = -1): integer;
     /// add a RawUtf8 value to this document, handled as array
     // - if instance's Kind is dvObject, it will raise an EDocVariant exception
     // - you can specify an optional index in the array where to insert
     // - returns the index of the corresponding newly added item
+    /// 将 RawUtf8 值添加到此文档，作为数组处理
+     // - 如果实例的 Kind 是 dvObject，它将引发 EDocVariant 异常
+     // - 您可以指定数组中插入位置的可选索引
+     // - 返回对应新添加项的索引
     function AddItemText(const aValue: RawUtf8; aIndex: integer = -1): integer;
     /// add one or several values to this document, handled as array
     // - if instance's Kind is dvObject, it will raise an EDocVariant exception
+    /// 添加一个或多个值到此文档，作为数组处理
+     // - 如果实例的 Kind 是 dvObject，它将引发 EDocVariant 异常
     procedure AddItems(const aValue: array of const);
     /// add one object document to this document
     // - if the document is an array, keep aName=''
     // - if the document is an object, set the new object property as aName
     // - new object will keep the same options as this document
     // - slightly faster than AddItem(_Obj(...)) or AddValue(aName, _Obj(...))
+    /// 向该文档添加一个对象文档
+     // - 如果文档是数组，则保留 aName=''
+     // - 如果文档是一个对象，则将新对象属性设置为 aName
+     // - 新对象将保留与本文档相同的选项
+     // - 比 AddItem(_Obj(...)) 或 AddValue(aName, _Obj(...)) 稍快
     procedure AddObject(const aNameValuePairs: array of const;
       const aName: RawUtf8 = '');
     /// add one or several values from another document
@@ -1762,9 +2633,14 @@ type
     // otherwise nothing is added
     // - for an object, dvoCheckForDuplicatedNames flag is used: use
     // AddOrUpdateFrom() to force objects merging
+    /// 添加另一个文档中的一个或多个值
+     // - 提供的文档应该与当前文档属于同一类型，否则不会添加任何内容
+     // - 对于对象，使用 dvoCheckForDuplicatedNames 标志：使用 AddOrUpdateFrom() 强制对象合并
     procedure AddFrom(const aDocVariant: Variant);
     /// merge (i.e. add or update) several values from another object
     // - current document should be an object
+    /// 合并（即添加或更新）另一个对象的多个值
+     // - 当前文档应该是一个对象
     procedure AddOrUpdateFrom(const aDocVariant: Variant;
       aOnlyAddMissing: boolean = false);
     /// add one or several properties, specified by path, from another object
@@ -1773,27 +2649,45 @@ type
     // ['doc', 'glossary/title'] of aPathDelim is '/'
     // - matching values would be added as root values, with the path as name
     // - instance and supplied aSource should be a dvObject
+    /// 从另一个对象添加一个或多个由路径指定的属性
+     // - 路径被定义为开放数组，例如 ['doc','glossary','title']，但也可以包含嵌套路径，例如 aPathDelim 的 ['doc.glossary', title'] 或 ['doc', 'glossary/title'] 是 '/'
+     // - 匹配值将作为根值添加，路径作为名称
+     // - 实例和提供的 aSource 应该是 dvObject
     procedure AddByPath(const aSource: TDocVariantData;
       const aPaths: array of RawUtf8; aPathDelim: AnsiChar = '.');
     /// delete a value/item in this document, from its index
     // - return TRUE on success, FALSE if the supplied index is not correct
+    /// 从文档的索引中删除一个值/项目
+     // - 成功时返回 TRUE，如果提供的索引不正确则返回 FALSE
     function Delete(Index: PtrInt): boolean; overload;
     /// delete a value/item in this document, from its name
     // - return TRUE on success, FALSE if the supplied name does not exist
+    /// 从文档的名称中删除一个值/项目
+     // - 成功时返回 TRUE，如果提供的名称不存在则返回 FALSE
     function Delete(const aName: RawUtf8): boolean; overload;
     /// delete/filter some values/items in this document, from their name
     // - return the number of deleted items
+    /// 从名称中删除/过滤本文档中的某些值/项目
+     // - 返回已删除项目的数量
     function Delete(const aNames: array of RawUtf8): integer; overload;
     /// delete a value/item in this document, from its name
     // - path is defined as a dotted name-space, e.g. 'doc.glossary.title'
     // - return TRUE on success, FALSE if the supplied name does not exist
     // - you can set e.g. aPathDelim = '/' to search e.g. for 'parent/child'
+    /// 从文档的名称中删除一个值/项目
+     // - 路径被定义为点状命名空间，例如 '文档.词汇表.标题'
+     // - 成功时返回 TRUE，如果提供的名称不存在则返回 FALSE
+     // - 你可以设置例如 aPathDelim = '/' 进行搜索，例如 对于“父母/孩子”
     function DeleteByPath(const aPath: RawUtf8; aPathDelim: AnsiChar = '.'): boolean;
     /// delete a value in this document, by property name match
     // - {aPropName:aPropValue} will be searched within the stored array or
     // object, and the corresponding item will be deleted, on match
     // - returns FALSE if no match is found, TRUE if found and deleted
     // - will call VariantEquals() for value comparison
+    /// 删除本文档中的一个值，通过属性名匹配
+     // - {aPropName:aPropValue} 将在存储的数组或对象中搜索，匹配时相应的项目将被删除
+     // - 如果未找到匹配则返回 FALSE，如果找到并删除则返回 TRUE
+     // - 将调用 VariantEquals() 进行值比较
     function DeleteByProp(const aPropName, aPropValue: RawUtf8;
       aPropValueCaseSensitive: boolean): boolean;
     /// delete one or several value/item in this document, from its value
@@ -1801,12 +2695,21 @@ type
     // - returns 0 if the document is not a dvObject, or if no match was found
     // - if the value exists several times, all occurences would be removed
     // - is optimized for DeleteByValue(null) call
+    /// 从其值中删除此文档中的一个或多个值/项
+     // - 返回已删除项目的数量
+     // - 如果文档不是 dvObject，或者没有找到匹配项，则返回 0
+     // - 如果该值存在多次，则所有出现的情况都将被删除
+     // - 针对DeleteByValue(null) 调用进行了优化
     function DeleteByValue(const aValue: Variant;
       CaseInsensitive: boolean = false): integer;
     /// delete all values matching the first characters of a property name
     // - returns the number of deleted items
     // - returns 0 if the document is not a dvObject, or if no match was found
     // - will use IdemPChar(), so search would be case-insensitive
+    /// 删除与属性名称的第一个字符匹配的所有值
+     // - 返回已删除项目的数量
+     // - 如果文档不是 dvObject，或者没有找到匹配项，则返回 0
+     // - 将使用 IdemPChar()，因此搜索不区分大小写
     function DeleteByStartName(aStartName: PUtf8Char;
       aStartNameLen: integer): integer;
     /// search a property match in this document, handled as array or object
@@ -1814,6 +2717,10 @@ type
     // object, and the corresponding item index will be returned, on match
     // - returns -1 if no match is found
     // - will call VariantEquals() for value comparison
+    /// 在此文档中搜索属性匹配，作为数组或对象处理
+     // - {aPropName:aPropValue} 将在存储的数组或对象中搜索，匹配时将返回相应的项目索引
+     // - 如果没有找到匹配则返回-1
+     // - 将调用 VariantEquals() 进行值比较
     function SearchItemByProp(const aPropName, aPropValue: RawUtf8;
       aPropValueCaseSensitive: boolean): integer; overload;
     /// search a property match in this document, handled as array or object
@@ -1821,6 +2728,10 @@ type
     // object, and the corresponding item index will be returned, on match
     // - returns -1 if no match is found
     // - will call VariantEquals() for value comparison
+    /// 在此文档中搜索属性匹配，作为数组或对象处理
+     // - {aPropName:aPropValue} 将在存储的数组或对象中搜索，匹配时将返回相应的项目索引
+     // - 如果没有找到匹配则返回-1
+     // - 将调用 VariantEquals() 进行值比较
     function SearchItemByProp(const aPropNameFmt: RawUtf8;
       const aPropNameArgs: array of const; const aPropValue: RawUtf8;
       aPropValueCaseSensitive: boolean): integer; overload;
@@ -1829,6 +2740,10 @@ type
     // and the corresponding item index will be returned, on match
     // - returns -1 if no match is found
     // - you could make several searches, using the StartIndex optional parameter
+    /// 在此文档中搜索一个值，作为数组处理
+     // - aValue 将在存储的数组中搜索，匹配时将返回相应的项目索引
+     // - 如果没有找到匹配则返回-1
+     // - 您可以使用 StartIndex 可选参数进行多次搜索
     function SearchItemByValue(const aValue: Variant;
       CaseInsensitive: boolean = false; StartIndex: PtrInt = 0): PtrInt;
     /// sort the document object values by name
@@ -1837,16 +2752,27 @@ type
     // can specify @StrComp as comparer function for case-sensitive ordering
     // - once sorted, you can use GetVarData(..,Compare) or GetAs*(..,Compare)
     // methods for much faster O(log(n)) binary search
+    /// 按名称对文档对象值进行排序
+     // - 如果文档不是 dvObject，则不执行任何操作
+     // - 默认情况下将遵循不区分大小写的顺序（@StrIComp），但是您
+     // 可以指定@StrComp作为区分大小写排序的比较器函数
+     // - 一旦排序，您可以使用 GetVarData(..,Compare) 或 GetAs*(..,Compare) 方法来实现更快的 O(log(n)) 二分搜索
     procedure SortByName(SortCompare: TUtf8Compare = nil;
       SortCompareReversed: boolean = false);
     /// sort the document object values by value using a comparison function
     // - work for both dvObject and dvArray documents
     // - will sort by UTF-8 text (VariantCompare) if no custom aCompare is supplied
+    /// 使用比较函数按值对文档对象值进行排序
+     // - 适用于 dvObject 和 dvArray 文档
+     // - 如果未提供自定义 aCompare，将按 UTF-8 文本 (VariantCompare) 排序
     procedure SortByValue(SortCompare: TVariantCompare = nil;
       SortCompareReversed: boolean = false);
     /// sort the document object values by value using a comparison method
     // - work for both dvObject and dvArray documents
     // - you should supply a TVariantComparer callback method
+    /// 使用比较方法按值对文档对象值进行排序
+     // - 适用于 dvObject 和 dvArray 文档
+     // - 您应该提供 TVariantComparer 回调方法
     procedure SortByRow(const SortComparer: TVariantComparer;
       SortComparerReversed: boolean = false);
     /// sort the document array values by a field of some stored objet values
@@ -1854,6 +2780,11 @@ type
     // - aValueCompare will be called with the aItemPropName values, not row
     // - will sort by UTF-8 text (VariantCompare) if no custom aValueCompare is supplied
     // - this method is faster than SortByValue/SortByRow
+    /// 按某些存储对象值的字段对文档数组值进行排序
+     // - 如果文档不是 dvArray，或者项目不是 dvObject，则不执行任何操作
+     // - aValueCompare 将使用 aItemPropName 值（而不是行）调用
+     // - 如果未提供自定义 aValueCompare，将按 UTF-8 文本 (VariantCompare) 排序
+     // - 此方法比 SortByValue/SortByRow 更快
     procedure SortArrayByField(const aItemPropName: RawUtf8;
       aValueCompare: TVariantCompare = nil;
       aValueCompareReverse: boolean = false;
@@ -1862,12 +2793,18 @@ type
     // - allow up to 4 fields (aItemPropNames[0]..aItemPropNames[3])
     // - do nothing if the document is not a dvArray, or if the items are no dvObject
     // - will sort by UTF-8 text (VariantCompare) if no aValueCompareField is supplied
+    /// 按某些存储对象值的字段对文档数组值进行排序
+     // - 最多允许 4 个字段 (aItemPropNames[0]..aItemPropNames[3])
+     // - 如果文档不是 dvArray，或者项目不是 dvObject，则不执行任何操作
+     // - 如果未提供 aValueCompareField，将按 UTF-8 文本
     procedure SortArrayByFields(const aItemPropNames: array of RawUtf8;
       aValueCompare: TVariantCompare = nil;
       const aValueCompareField: TVariantCompareField = nil;
       aValueCompareReverse: boolean = false; aNameSortedCompare: TUtf8Compare = nil);
     /// inverse the order of Names and Values of this document
     // - could be applied after a content sort if needed
+    /// 反转本文档的名称和值的顺序
+     // - 如果需要，可以在内容排序之后应用
     procedure Reverse;
     /// create a TDocVariant object, from a selection of properties of the
     // objects of this document array, by property name
@@ -1875,17 +2812,24 @@ type
     // its properties
     // - if the document is a dvArray, the reduction will be applied to each
     // stored item, if it is a document
+    /// 根据属性名称从该文档数组的对象属性中创建一个 TDocVariant 对象
+     // - 如果文档是 dvObject，则归约将应用于其所有属性
+     // - 如果文档是 dvArray，则缩减将应用于每个存储的项目（如果它是文档）
     procedure Reduce(const aPropNames: array of RawUtf8; aCaseSensitive: boolean;
       var result: TDocVariantData; aDoNotAddVoidProp: boolean = false); overload;
     /// create a TDocVariant object, from a selection of properties of the
     // objects of this document array, by property name
     // - always returns a TDocVariantData, even if no property name did match
     // (in this case, it is dvUndefined)
+    /// 根据属性名称从该文档数组的对象属性中创建一个 TDocVariant 对象
+     // - 始终返回 TDocVariantData，即使没有匹配的属性名称（在本例中为 dvUndefined）
     function Reduce(const aPropNames: array of RawUtf8; aCaseSensitive: boolean;
       aDoNotAddVoidProp: boolean = false): variant; overload;
     /// create a TDocVariant array, from the values of a single property of the
     // objects of this document array, specified by name
     // - you can optionally apply an additional filter to each reduced item
+    /// 根据此文档数组的对象的单个属性的值创建一个 TDocVariant 数组，按名称指定
+     // - 您可以选择对每个减少的项目应用额外的过滤器
     procedure ReduceAsArray(const aPropName: RawUtf8;
       var result: TDocVariantData;
       const OnReduce: TOnReducePerItem = nil); overload;
@@ -1894,11 +2838,16 @@ type
     // - always returns a TDocVariantData, even if no property name did match
     // (in this case, it is dvUndefined)
     // - you can optionally apply an additional filter to each reduced item
+    /// 根据此文档数组的对象的单个属性的值创建一个 TDocVariant 数组，按名称指定
+     // - 始终返回 TDocVariantData，即使没有匹配的属性名称（在本例中为 dvUndefined）
+     // - 您可以选择对每个减少的项目应用额外的过滤器
     function ReduceAsArray(const aPropName: RawUtf8;
       const OnReduce: TOnReducePerItem = nil): variant; overload;
     /// create a TDocVariant array, from the values of a single property of the
     // objects of this document array, specified by name
     // - this overloaded method accepts an additional filter to each reduced item
+    /// 根据此文档数组的对象的单个属性的值创建一个 TDocVariant 数组，按名称指定
+     // - 此重载方法接受每个缩减项的附加过滤器
     procedure ReduceAsArray(const aPropName: RawUtf8;
       var result: TDocVariantData;
       const OnReduce: TOnReducePerValue); overload;
@@ -1907,15 +2856,22 @@ type
     // - always returns a TDocVariantData, even if no property name did match
     // (in this case, it is dvUndefined)
     // - this overloaded method accepts an additional filter to each reduced item
+    /// 根据此文档数组的对象的单个属性的值创建一个 TDocVariant 数组，按名称指定
+     // - 始终返回 TDocVariantData，即使没有匹配的属性名称（在本例中为 dvUndefined）
+     // - 此重载方法接受每个缩减项的附加过滤器
     function ReduceAsArray(const aPropName: RawUtf8;
       const OnReduce: TOnReducePerValue): variant; overload;
     /// return the variant values of a single property of the objects of this
     // document array, specified by name
     // - returns nil if the document is not a dvArray
+    /// 返回此文档数组的对象的单个属性的变体值，由名称指定
+     // - 如果文档不是 dvArray，则返回 nil
     function ReduceAsVariantArray(const aPropName: RawUtf8;
       aDuplicates: TSearchDuplicate = sdNone): TVariantDynArray;
     /// rename some properties of a TDocVariant object
     // - returns the number of property names modified
+    /// 重命名 TDocVariant 对象的一些属性
+     // - 返回修改的属性名称的数量
     function Rename(const aFromPropName, aToPropName: TRawUtf8DynArray): integer;
     /// return a dynamic array with all dvObject Names, and length() = Count
     // - since length(Names) = Capacity, you can use this method to retrieve
@@ -1925,6 +2881,11 @@ type
     // - will internally force length(Names)=length(Values)=Capacity=Count and
     // return the Names[] instance with no memory (re)allocation
     // - if the document is not a dvObject, will return nil
+    /// 返回包含所有 dvObject 名称的动态数组，且 length() = Count
+     // - 由于 length(Names) = Capacity，您可以使用此方法检索所有对象键
+     // - 如果需要迭代键名称，请考虑使用 FieldNames 迭代器或 Names[0..Count-1]
+     // - 将在内部强制 length(Names)=length(Values)=Capacity=Count 并返回 Names[] 实例，无需内存（重新）分配
+     // - 如果文档不是 dvObject，将返回 nil
     function GetNames: TRawUtf8DynArray;
     /// map {"obj.prop1"..,"obj.prop2":..} into {"obj":{"prop1":..,"prop2":...}}
     // - the supplied aObjectPropName should match the incoming dotted value
@@ -1933,12 +2894,20 @@ type
     // whole process would be ignored
     // - return FALSE if the TDocVariant did not change
     // - return TRUE if the TDocVariant has been flattened
+    /// 将 {"obj.prop1"..,"obj.prop2":..} 映射到 {"obj":{"prop1":..,"prop2":...}}
+     // - 提供的 aObjectPropName 应与所有属性的传入点值匹配（例如“obj”代表“obj.prop1”）
+     // - 如果任何传入属性不是“obj.prop#”形式，则整个过程将被忽略
+     // - 如果 TDocVariant 未更改，则返回 FALSE
+     // - 如果 TDocVariant 已被展平，则返回 TRUE
     function FlattenAsNestedObject(const aObjectPropName: RawUtf8): boolean;
 
     /// how this document will behave
     // - those options are set when creating the instance
     // - dvoArray and dvoObject are not options, but define the document Kind,
     // so those items are ignored when assigned to this property
+    /// 该文档的行为方式
+     // - 这些选项在创建实例时设置
+     // - dvoArray 和 dvoObject 不是选项，而是定义文档 Kind，因此在分配给此属性时这些项目将被忽略
     property Options: TDocVariantOptions
       read VOptions write SetOptions;
     /// returns the document internal layout
@@ -1948,19 +2917,31 @@ type
     // - but is you use AddItem(), values will have no associated names: the
     // document will be a dvArray
     // - value computed from the dvoArray and dvoObject presence in Options
+    /// 返回文档内部布局
+     // - 初始化后，它将返回 dvUndefined
+     // - 大多数时候，您将使用 AddValue() 或通过设置变体属性来添加命名值：它将返回 dvObject
+     // - 但是如果您使用 AddItem()，值将没有关联的名称：文档将是 dvArray
+     // - 根据选项中存在的 dvoArray 和 dvoObject 计算得出的值
     property Kind: TDocVariantKind
       read GetKind;
     /// return the custom variant type identifier, i.e. DocVariantType.VarType
+    /// 返回自定义变体类型标识符，即 DocVariantType.VarType
     property VarType: word
       read VType;
     /// number of items stored in this document
     // - is 0 if Kind=dvUndefined
     // - is the number of name/value pairs for Kind=dvObject
     // - is the number of items for Kind=dvArray
+    /// 该文档中存储的项目数
+     // - 如果 Kind=dvUndefined 则为 0
+     // - 是 Kind=dvObject 的名称/值对的数量
+     // - 是 Kind=dvArray 的项目数
     property Count: integer
       read VCount;
     /// the current capacity of this document
     // - allow direct access to VValue[] length
+    /// 该文件的当前容量
+     // - 允许直接访问 VValue[] 长度
     property Capacity: integer
       read GetCapacity write SetCapacity;
     /// direct acces to the low-level internal array of values
@@ -1968,6 +2949,16 @@ type
     // or use FieldValues iterator if you want the exact count
     // - transtyping a variant and direct access to TDocVariantData is the
     // fastest way of accessing all properties of a given dvObject:
+    // ! with _Safe(aVariantObject)^ do
+    // !   for i := 0 to Count-1 do
+    // !     writeln(Names[i],'=',Values[i]);
+    // - or to access a dvArray items (e.g. a MongoDB collection):
+    // ! with TDocVariantData(aVariantArray) do
+    // !   for i := 0 to Count-1 do
+    // !     writeln(Values[i]);
+    /// 直接访问低级内部值数组
+     // - 请注意 length(Values)=Capacity 而不是 Count，因此如果您想要精确的计数，请复制(Values, 0, Count) 或使用 FieldValues 迭代器
+     // - 转换变体并直接访问 TDocVariantData 是访问给定 dvObject 所有属性的最快方法：
     // ! with _Safe(aVariantObject)^ do
     // !   for i := 0 to Count-1 do
     // !     writeln(Names[i],'=',Values[i]);
@@ -1983,6 +2974,13 @@ type
     // or use FieldNames iterator or GetNames if you want the exact count
     // - transtyping a variant and direct access to TDocVariantData is the
     // fastest way of accessing all properties of a given dvObject:
+    // ! with _Safe(aVariantObject)^ do
+    // !   for i := 0 to Count-1 do
+    // !     writeln(Names[i],'=',Values[i]);
+    /// 直接访问低级内部名称数组
+     // - 如果 Kind 不是 dvObject，则为 void (nil)
+     // - 请注意 length(Names)=Capacity 而不是 Count，因此如果需要精确的计数，请复制(Names, 0, Count) 或使用 FieldNames 迭代器或 GetNames
+     // - 转换变体并直接访问 TDocVariantData 是访问给定 dvObject 所有属性的最快方法：
     // ! with _Safe(aVariantObject)^ do
     // !   for i := 0 to Count-1 do
     // !     writeln(Names[i],'=',Values[i]);
@@ -2043,6 +3041,48 @@ type
     // GetValueOrRaiseException or GetValueOrNull/GetValueOrEmpty
     // - see U[] I[] B[] D[] O[] O_[] A[] A_[] _[] properties for direct access
     // of strong typed values, or P[] to retrieve a variant from its path
+    /// 在这个文档中查找一个项目，并返回它的值
+     // - 如果 aNameOrIndex 既不是整数也不是字符串，则引发 EDocVariant
+     // - 如果 Kind 是 dvArray 并且 aNameOrIndex 是字符串，或者 Kind 是 dvObject 并且 aNameOrIndex 是整数，则引发 EDocVariant
+     // - 如果 Kind 是 dvObject 并且 aNameOrIndex 是字符串（在对象属性名称中找不到该字符串）并且在选项中设置了 dvoReturnNullForUnknownProperty，则引发 EDocVariant
+     // - 如果 Kind 是 dvArray 并且 aNameOrIndex 是不在 0..Count-1 范围内的整数并且在选项中设置了 dvoReturnNullForUnknownProperty，则引发 EDocVariant
+     // - 所以你可以直接使用：
+    // ! // for an array document:
+    // ! aVariant := TDocVariant.NewArray(['one',2,3.0]);
+    // ! for i := 0 to TDocVariantData(aVariant).Count-1 do
+    // !   aValue := TDocVariantData(aVariant).Value[i];
+    // ! // for an object document:
+    // ! aVariant := TDocVariant.NewObject(['name','John','year',1972]);
+    // ! assert(aVariant.Name=TDocVariantData(aVariant)['name']);
+    // ! assert(aVariant.year=TDocVariantData(aVariant)['year']);
+     // - 由于变体执行的内部实现（_DispInvoke() 函数有点慢），执行起来有点快：
+     // ! aValue := TDocVariantData(aVariant).Value['name'];
+     // 或者
+     // ! aValue := _Safe(aVariant).Value['name'];
+     // 代替
+     // ! aValue := aVariant.name;
+     // 但是当然，如果想通过索引访问内容（通常对于 dvArray），使用 Values[] - 和 Names[] - 属性比这个变体索引伪属性要快得多：
+    // ! with TDocVariantData(aVariant) do
+    // !   for i := 0 to Count-1 do
+    // !     Writeln(Values[i]);
+     // 比以下更快
+    // ! with TDocVariantData(aVariant) do
+    // !   for i := 0 to Count-1 do
+    // !     Writeln(Value[i]);
+     // 这比以下更快：
+    // ! for i := 0 to aVariant.Count-1 do
+    // !   Writeln(aVariant._(i));
+     // - 此属性将以 varByRef 形式返回值（就像任何 TDocVariant 实例的变体后期绑定一样），因此您可以编写：
+    // !var
+    // !  Doc: TDocVariantData; // stack-allocated variable
+    // !begin
+    // !  Doc.InitJson('{arr:[1,2]}');
+    // !  assert(Doc.Count=2);
+    // !  Doc.Value['arr'].Add(3);  // works since Doc.Value['arr'] is varByRef
+    // !  writeln(Doc.ToJson);      // will write '{"arr":[1,2,3]}'
+    // !end;
+     // - 如果您想以副本形式访问属性，即将其分配给一个变体变量，该变体变量在此 TDocVariant 实例释放后仍保持活动状态，则不应使用 Value[]，而应使用 GetValueOrRaiseException 或 GetValueOrNull/GetValueOrEmpty
+     // - 请参阅 U[] I[] B[] D[] O[] O_[] A[] A_[] _[] 属性以直接访问强类型值，或使用 P[] 从其检索变体 小路    
     property Value[const aNameOrIndex: Variant]: Variant
       read GetValueOrItem write SetValueOrItem; default;
 
@@ -2051,6 +3091,11 @@ type
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
     // - use GetAsRawUtf8() if you want to check the availability of the field
     // - U['prop'] := 'value' would add a new property, or overwrite an existing
+    /// 从dvObject的名称直接访问UTF-8存储的属性值
+     // - 比基于变体的 Value[] 默认属性稍快
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果您想检查字段的可用性，请使用 GetAsRawUtf8()
+     // - U['prop'] := 'value' 将添加新属性，或覆盖现有属性
     property U[const aName: RawUtf8]: RawUtf8
       read GetRawUtf8ByName write SetRawUtf8ByName;
     /// direct string access to a dvObject UTF-8 stored property value from its name
@@ -2060,6 +3105,12 @@ type
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
     // - use GetAsRawUtf8() if you want to check the availability of the field
     // - S['prop'] := 'value' would add a new property, or overwrite an existing
+    /// 从名称直接字符串访问 dvObject UTF-8 存储的属性值
+     // - 只是 U[] 属性的包装，以避免使用纯字符串变量时出现编译警告（内部将使用 RawUtf8 进行存储）
+     // - 比基于变体的 Value[] 默认属性稍快
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果您想检查字段的可用性，请使用 GetAsRawUtf8()
+     // - S['prop'] := 'value' 将添加新属性，或覆盖现有属性
     property S[const aName: RawUtf8]: string
       read GetStringByName write SetStringByName;
     /// direct access to a dvObject integer stored property value from its name
@@ -2067,6 +3118,11 @@ type
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
     // - use GetAsInt/GetAsInt64 if you want to check the availability of the field
     // - I['prop'] := 123 would add a new property, or overwrite an existing
+    /// 从其名称直接访问 dvObject 整数存储的属性值
+     // - 比基于变体的 Value[] 默认属性稍快
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果您想检查字段的可用性，请使用 GetAsInt/GetAsInt64
+     // - I['prop'] := 123 将添加新属性，或覆盖现有属性
     property I[const aName: RawUtf8]: Int64
       read GetInt64ByName write SetInt64ByName;
     /// direct access to a dvObject boolean stored property value from its name
@@ -2074,6 +3130,11 @@ type
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
     // - use GetAsBoolean if you want to check the availability of the field
     // - B['prop'] := true would add a new property, or overwrite an existing
+    /// 从名称直接访问 dvObject 布尔存储属性值
+     // - 比基于变体的 Value[] 默认属性稍快
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果您想检查字段的可用性，请使用 GetAsBoolean
+     // - B['prop'] := true 将添加新属性，或覆盖现有属性
     property B[const aName: RawUtf8]: boolean
       read GetBooleanByName write SetBooleanByName;
     /// direct access to a dvObject floating-point stored property value from its name
@@ -2081,6 +3142,11 @@ type
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
     // - use GetAsDouble if you want to check the availability of the field
     // - D['prop'] := 1.23 would add a new property, or overwrite an existing
+    /// 从dvObject的名称直接访问浮点存储的属性值
+     // - 比基于变体的 Value[] 默认属性稍快
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果您想检查字段的可用性，请使用 GetAsDouble
+     // - D['prop'] := 1.23 将添加新属性，或覆盖现有属性
     property D[const aName: RawUtf8]: Double
       read GetDoubleByName write SetDoubleByName;
     /// direct access to a dvObject existing dvObject property from its name
@@ -2088,6 +3154,10 @@ type
     // - O['prop'] would return a fake void TDocVariant if the property is not
     // existing or not a dvObject, just like GetAsDocVariantSafe()
     // - use O_['prop'] to force adding any missing property
+    /// 从dvObject的名称直接访问现有的dvObject属性
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果属性不存在或不是 dvObject，O['prop'] 将返回一个假 void TDocVariant，就像 GetAsDocVariantSafe() 一样
+     // - 使用 O_['prop'] 强制添加任何缺失的属性
     property O[const aName: RawUtf8]: PDocVariantData
       read GetObjectExistingByName;
     /// direct access or add a dvObject's dvObject property from its name
@@ -2095,6 +3165,10 @@ type
     // - O_['prop'] would add a new property if there is none existing, or
     // overwrite an existing property which is not a dvObject
     // - the new property object would inherit from the Options of this instance
+    /// 直接访问或从名称添加dvObject的dvObject属性
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果不存在，O_['prop'] 将添加一个新属性，或者覆盖不是 dvObject 的现有属性
+     // - 新的属性对象将从该实例的选项继承
     property O_[const aName: RawUtf8]: PDocVariantData
       read GetObjectOrAddByName;
     /// direct access to a dvObject existing dvArray property from its name
@@ -2102,6 +3176,10 @@ type
     // - A['prop'] would return a fake void TDocVariant if the property is not
     // existing or not a dvArray, just like GetAsDocVariantSafe()
     // - use A_['prop'] to force adding any missing property
+    /// 从dvObject的名称直接访问现有的dvArray属性
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果属性不存在或不是 dvArray，A['prop'] 将返回一个假 void TDocVariant，就像 GetAsDocVariantSafe() 一样
+     // - 使用 A_['prop'] 强制添加任何缺失的属性
     property A[const aName: RawUtf8]: PDocVariantData
       read GetArrayExistingByName;
     /// direct access or add a dvObject's dvArray property from its name
@@ -2109,6 +3187,10 @@ type
     // - A_['prop'] would add a new property if there is none existing, or
     // overwrite an existing property which is not a dvArray
     // - the new property array would inherit from the Options of this instance
+    /// 直接访问或从名称添加 dvObject 的 dvArray 属性
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
+     // - 如果不存在，A_['prop'] 将添加一个新属性，或者覆盖不是 dvArray 的现有属性
+     // - 新的属性数组将从该实例的选项继承
     property A_[const aName: RawUtf8]: PDocVariantData
       read GetArrayOrAddByName;
     /// direct access to a dvArray's TDocVariant property from its index
@@ -2118,30 +3200,43 @@ type
     // - _[ndx] would return a fake void TDocVariant if aIndex is out of range,
     // if the property is not existing or not a TDocVariantData (just like
     // GetAsDocVariantSafe)
+    /// 从索引直接访问 dvArray 的 TDocVariant 属性
+     // - 简单值可以直接使用Values[]动态数组，但是要访问TDocVariantData成员，这个属性更安全
+     // - 遵循 dvoReturnNullForUnknownProperty 选项引发异常
+     // - 如果 aIndex 超出范围、属性不存在或不是 TDocVariantData，_[ndx] 将返回假 void TDocVariant（就像 GetAsDocVariantSafe）
     property _[aIndex: integer]: PDocVariantData
       read GetAsDocVariantByIndex;
     /// direct access to a dvObject value stored property value from its path name
     // - default Value[] will check only names in the current object properties,
     // whereas this property will recognize e.g. 'parent.child' nested objects
     // - follows dvoNameCaseSensitive and dvoReturnNullForUnknownProperty options
+    /// 从其路径名直接访问dvObject值存储的属性值
+     // - 默认 Value[] 将仅检查当前对象属性中的名称，而此属性将识别例如 “parent.child”嵌套对象
+     // - 遵循 dvoNameCaseSensitive 和 dvoReturnNullForUnknownProperty 选项
     property P[const aNameOrPath: RawUtf8]: Variant
       read GetVariantByPath;
   end;
   {$A+} { packet object not allowed since Delphi 2009 :( }
+  { 自 Delphi 2009 起不允许使用数据包对象:( }
 
 var
   /// the internal custom variant type used to register TDocVariant
+  /// 用于注册TDocVariant的内部自定义变体类型
   DocVariantType: TDocVariant;
 
   /// copy of DocVariantType.VarType
   // - as used by inlined functions of TDocVariantData
+  /// DocVariantType.VarType 的副本
+   // - 由 TDocVariantData 的内联函数使用
   DocVariantVType: cardinal;
 
   // defined here for inlining - properly filled in initialization section below
+  // 此处定义用于内联 - 正确填写下面的初始化部分
   DV_FAST: array[TDocVariantKind] of TVarData;
 
 
 /// retrieve the text representation of a TDocVairnatKind
+/// 检索 TDocVairnatKind 的文本表示
 function ToText(kind: TDocVariantKind): PShortString; overload;
 
 /// direct access to a TDocVariantData from a given variant instance
@@ -2155,6 +3250,14 @@ function ToText(kind: TDocVariantKind): PShortString; overload;
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData
+// - 返回指向对应于变体实例的 TDocVariantData 的指针，该指针可能是 varByRef 类型（例如，当通过后期绑定检索时）
+// - 如果实例不是 TDocVariant，则引发 EDocVariant 异常
+// - 以下直接转输入可能会失败，例如 对于 varByRef 值：
+//！ TDocVariantData(aVarDoc.ArrayProp).Add('新项目');
+// - 所以你可以编写以下内容：
+//！ DocVariantData(aVarDoc.ArrayProp).AddItem('新项目');
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function DocVariantData(const DocVariant: variant): PDocVariantData;
 
 const
@@ -2165,6 +3268,11 @@ const
   // - its VType is varNull, so would be viewed as a null variant
   // - dvoReturnNullForUnknownProperty is defined, so that U[]/I[]... methods
   // won't raise any exception about unexpected field name
+  /// 使用常量，例如 通过 _Safe() 和 _DV() 重载函数
+   // - 将位于 exe 的代码部分，因此设计为只读
+   // - Kind=dvUndefined 且 Count=0，因此 _Safe() 将返回有效但无效的文档
+   // - 它的 VType 是 varNull，因此将被视为空变体
+   // - 定义了 dvoReturnNullForUnknownProperty，以便 U[]/I[]... 方法不会引发任何有关意外字段名称的异常
   DocVariantDataFake: TDocVariantData = (
     VType: varNull;
     VOptions: [dvoReturnNullForUnknownProperty]{%H-});
@@ -2188,6 +3296,20 @@ const
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData
+// - 返回指向对应于变体实例的 TDocVariantData 的指针，该指针可能是 varByRef 类型（例如，当通过后期绑定检索时）
+// - 如果提供的变体不是 TDocVariant 实例，将返回一个 Kind=dvUndefined 的只读假 TDocVariantData，因此可以安全地在 with 块中使用（当然，使用“with”审核）：
+// ! with _Safe(aDocVariant)^ do
+// !   for ndx := 0 to Count-1 do // here Count=0 for the "fake" result
+// !     writeln(Names[ndx]);
+// 或排除“with”语句，作为更具可读性的代码：
+// ! var dv: PDocVariantData;
+// !     ndx: PtrInt;
+// ! begin
+// !   dv := _Safe(aDocVariant);
+// !   for ndx := 0 to dv.Count-1 do // here Count=0 for the "fake" result
+// !     writeln(dv.Names[ndx]);
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function _Safe(const DocVariant: variant): PDocVariantData; overload;
   {$ifdef FPC}inline;{$endif} // Delphi has problems inlining this :(
 
@@ -2199,6 +3321,10 @@ function _Safe(const DocVariant: variant): PDocVariantData; overload;
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData
+// - 返回指向对应于变体实例的 TDocVariantData 的指针，该指针可能是 varByRef 类型（例如，当通过后期绑定检索时）
+// - 将检查提供的文档类型，即 dvObject 或 dvArray，如果不匹配则引发 EDocVariant 异常
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function _Safe(const DocVariant: variant;
   ExpectedKind: TDocVariantKind): PDocVariantData; overload;
   {$ifdef HASINLINE}inline;{$endif}
@@ -2212,6 +3338,10 @@ function _Safe(const DocVariant: variant;
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData
+// - 返回 true 并使用指向对应于变体实例的 TDocVariantData 的指针设置 DocVariant，该指针可能是 varByRef 类型（例如，当通过后期绑定检索时）
+// - 如果提供的 Value 不是 TDocVariant，而是例如，则返回 false 字符串、数字或其他类型的自定义变体
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function _Safe(const DocVariant: variant; out DV: PDocVariantData): boolean; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -2222,10 +3352,16 @@ function _Safe(const DocVariant: variant; out DV: PDocVariantData): boolean; ove
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData 数组
+// - 返回 true 并设置 DV 为指向对应于变体实例的 TDocVariantData 的指针（如果它是 dvArray）
+// - 如果提供的 Value 不是数组 TDocVariant，则返回 false
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function _SafeArray(const Value: variant; out DV: PDocVariantData): boolean; overload;
 
 /// direct access to a TDocVariantData array from a given variant instance
 // - overload to check for a given number of itemsin the array
+/// 从给定的变体实例直接访问 TDocVariantData 数组
+// - 重载以检查数组中给定数量的项目
 function _SafeArray(const Value: variant; ExpectedCount: integer;
   out DV: PDocVariantData): boolean; overload;
 
@@ -2236,21 +3372,31 @@ function _SafeArray(const Value: variant; ExpectedCount: integer;
 // - note: due to a local variable lifetime change in Delphi 11, don't use
 // this function with a temporary variant (e.g. from TList<variant>.GetItem) -
 // call _DV() and a local TDocVariantData instead of a PDocVariantData
+/// 从给定的变体实例直接访问 TDocVariantData 对象
+// - 返回 true 并使用指向对应于变体实例的 TDocVariantData 的指针设置 DV（如果它是 dvObject）
+// - 如果提供的 Value 不是对象 TDocVariant，则返回 false
+// - 注意：由于 Delphi 11 中的局部变量生命周期发生变化，请勿将此函数与临时变量一起使用（例如，来自 TList<variant>.GetItem） - 调用 _DV() 和本地 TDocVariantData 而不是 PDocVariantData
 function _SafeObject(const Value: variant; out DV: PDocVariantData): boolean;
 
 /// direct copy of a TDocVariantData from a given variant instance
 // - slower, but maybe used instead of _Safe() e.g. on Delphi 11
+/// 从给定变体实例直接复制 TDocVariantData
+// - 速度较慢，但可以代替 _Safe() 使用，例如 在Delphi 11 上
 function _DV(const DocVariant: variant): TDocVariantData; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// direct copy of a TDocVariantData from a given variant instance
 // - slower, but maybe used instead of _Safe() e.g. on Delphi 11
+/// 从给定变体实例直接复制 TDocVariantData
+// - 速度较慢，但可以代替 _Safe() 使用，例如 在 Delphi 11 上
 function _DV(const DocVariant: variant;
   ExpectedKind: TDocVariantKind): TDocVariantData; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// direct copy of a TDocVariantData from a given variant instance
 // - slower, but maybe used instead of _Safe() e.g. on Delphi 11
+/// 从给定变体实例直接复制 TDocVariantData
+// - 速度较慢，但可以代替 _Safe() 使用，例如 Delphi 11 上
 function _DV(const DocVariant: variant;
   var DV: TDocVariantData): boolean; overload;
   {$ifdef FPC}inline;{$endif} // Delphi has troubles inlining goto/label
@@ -2266,6 +3412,13 @@ function _DV(const DocVariant: variant;
 // properties can be slow - if you expect the data to be read-only or not
 // propagated into another place, set Options=[dvoValueCopiedByReference]
 // or using _ObjFast() will increase the process speed a lot
+/// 初始化一个变体实例来存储一些基于文档的对象内容
+// - 对象将使用两两提供的数据进行初始化，如名称、值对，例如
+// ! aVariant := _Obj(['name','John','year',1972]);
+// 或者甚至使用嵌套对象：
+// ! aVariant := _Obj(['name','John','doc',_Obj(['one',1,'two',2.0])]);
+// - 此全局函数是 TDocVariant.NewObject() 的别名
+// - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，请设置 Options=[dvoValueCopiedByReference] 或使用 _ObjFast() 会大大提高处理速度
 function _Obj(const NameValuePairs: array of const;
   Options: TDocVariantOptions = []): variant;
 
@@ -2275,15 +3428,21 @@ function _Obj(const NameValuePairs: array of const;
 // initialized with supplied the Name/Value pairs
 // - this function will also ensure that ensure Obj is not stored by reference,
 // but as a true TDocVariantData
+/// 将属性值添加到基于文档的对象内容
+// - 如果 Obj 是 TDocVariant 对象，将添加名称/值对
+// - 如果 Obj 不是 TDocVariant，将创建一个新的快速文档，并使用提供的名称/值对进行初始化
+// - 该函数还将确保确保 Obj 不是通过引用存储，而是作为真正的 TDocVariantData
 procedure _ObjAddProp(const Name: RawUtf8; const Value: variant;
   var Obj: variant); overload;
 
 /// add a document property value to a document-based object content
+/// 将文档属性值添加到基于文档的对象内容
 procedure _ObjAddProp(const Name: RawUtf8; const Value: TDocVariantData;
   var Obj: variant); overload;
   {$ifdef HASINLINE} inline; {$endif}
 
 /// add a RawUtf8 property value to a document-based object content
+/// 将 RawUtf8 属性值添加到基于文档的对象内容
 procedure _ObjAddPropU(const Name: RawUtf8; const Value: RawUtf8;
   var Obj: variant);
 
@@ -2293,6 +3452,10 @@ procedure _ObjAddPropU(const Name: RawUtf8; const Value: RawUtf8;
 // initialized with supplied the Name/Value pairs
 // - this function will also ensure that ensure Obj is not stored by reference,
 // but as a true TDocVariantData
+/// 添加一些属性值到基于文档的对象内容
+// - 如果 Obj 是 TDocVariant 对象，将添加名称/值对
+// - 如果 Obj 不是 TDocVariant，将创建一个新的快速文档，并使用提供的名称/值对进行初始化
+// - 该函数还将确保确保 Obj 不是通过引用存储，而是作为真正的 TDocVariantData
 procedure _ObjAddProps(const NameValuePairs: array of const;
   var Obj: variant); overload;
 
@@ -2300,6 +3463,10 @@ procedure _ObjAddProps(const NameValuePairs: array of const;
 // - if Document is not a TDocVariant object, will do nothing
 // - if Obj is a TDocVariant object, will add Document fields to its content
 // - if Obj is not a TDocVariant object, Document will be copied to Obj
+/// 将文档的属性值添加到基于文档的对象内容
+// - 如果 Document 不是 TDocVariant 对象，则不执行任何操作
+// - 如果 Obj 是 TDocVariant 对象，则会将文档字段添加到其内容中
+// - 如果 Obj 不是 TDocVariant 对象，Document 将被复制到 Obj
 procedure _ObjAddProps(const Document: variant;
   var Obj: variant); overload;
 
@@ -2311,6 +3478,11 @@ procedure _ObjAddProps(const Document: variant;
 // properties can be slow - if you expect the data to be read-only or not
 // propagated into another place, set Options = [dvoValueCopiedByReference]
 // or using _ArrFast() will increase the process speed a lot
+/// 初始化一个变体实例来存储一些基于文档的数组内容
+// - 数组将使用作为参数提供的数据进行初始化，例如
+//！ aVariant := _Arr(['一',2,3.0]);
+// - 此全局函数是 TDocVariant.NewArray() 的别名
+// - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，请设置 Options = [dvoValueCopiedByReference] 或使用 _ArrFast() 会大大提高处理速度
 function _Arr(const Items: array of const;
   Options: TDocVariantOptions = []): variant;
 
@@ -2345,6 +3517,30 @@ function _Arr(const Items: array of const;
 // will increase the process speed a lot, or use _JsonFast()
 // - handle only currency for floating point values: call _JsonFastFloat or set
 // dvoAllowDoubleValue option to support double, with potential precision loss
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容
+// - 此全局函数是 TDocVariant.NewJson() 的别名，如果 JSON 内容未正确转换，将返回未分配的变体
+// - 对象或数组将从提供的 JSON 内容初始化，例如
+// ! aVariant := _Json('{"id":10,"doc":{"name":"John","birthyear":1972}}');
+// ! // now you can access to the properties via late binding
+// ! assert(aVariant.id=10);
+// ! assert(aVariant.doc.name='John');
+// ! assert(aVariant.doc.birthYear=1972);
+// ! // and also some pseudo-properties:
+// ! assert(aVariant._count=2);
+// ! assert(aVariant.doc._kind=ord(dvObject));
+// ! // or with a JSON array:
+// ! aVariant := _Json('["one",2,3]');
+// ! assert(aVariant._kind=ord(dvArray));
+// ! for i := 0 to aVariant._count-1 do
+// !   writeln(aVariant._(i));
+// - 除了 JSON RFC 规范严格模式之外，此方法还将处理一些类似 BSON 的扩展，例如 不带引号的字段名称：
+// ! aVariant := _Json('{id:10,doc:{name:"John",birthyear:1972}}');
+// - 如果应用程序中使用了 mormot.db.nosql.bson 单元，MongoDB Shell 语法也将被识别以创建 TBsonVariant，
+// 如 ! new Date() ObjectId() MinKey MaxKey /<jRegex>/<jOptions> 
+// 请参阅@http://docs.mongodb.org/manual/reference/mongodb-extended-json
+// - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，
+// 在选项中添加 dvoValueCopiedByReference 将大大提高处理速度 ，或使用 _JsonFast()
+// - 仅处理浮点值的货币：调用 _JsonFastFloat 或设置 dvoAllowDoubleValue 选项以支持双精度，但可能会导致精度损失
 function _Json(const Json: RawUtf8;
   Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty]): variant; overload;
   {$ifdef HASINLINE}inline;{$endif}
@@ -2369,6 +3565,21 @@ function _Json(const Json: RawUtf8;
 // properties can be slow - if you expect the data to be read-only or not
 // propagated into another place, add dvoValueCopiedByReference in Options
 // will increase the process speed a lot, or use _JsonFast()
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容，并带有参数格式
+// - _Json(FormatUtf8(...,JsonFormat=true)) 函数的包装，即为每个 % 插入每个 Args[]，为每个 ? 插入 Params[]，
+// 并使用正确的 JSON 转义字符串值，并写入 嵌套 _Obj() / _Arr() 实例作为预期的 JSON 对象/数组
+// - 典型用法（在 mormot.db.nosql.bson 单元的上下文中）可能是：
+// ! aVariant := _JsonFmt('{%:{$in:[?,?]}}',['type'],['food','snack']);
+// ! aVariant := _JsonFmt('{type:{$in:?}}',[],[_Arr(['food','snack'])]);
+// ! // which are the same as:
+// ! aVariant := _JsonFmt('{type:{$in:["food","snack"]}}');
+// ! // in this context:
+// ! u := VariantSaveJson(aVariant);
+// ! assert(u='{"type":{"$in":["food","snack"]}}');
+// ! u := VariantSaveMongoJson(aVariant,modMongoShell);
+// ! assert(u='{type:{$in:["food","snack"]}}');
+// - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，
+// 在选项中添加 dvoValueCopiedByReference 将大大提高处理速度 ，或使用 _JsonFast()
 function _JsonFmt(const Format: RawUtf8; const Args, Params: array of const;
   Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty]): variant; overload;
 
@@ -2376,6 +3587,8 @@ function _JsonFmt(const Format: RawUtf8; const Args, Params: array of const;
 // from a supplied (extended) JSON content, with parameters formating
 // - this overload function will set directly a local variant variable,
 // and would be used by inlined _JsonFmt/_JsonFastFmt functions
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容，并带有参数格式
+// - 此重载函数将直接设置局部变量变量，并将由内联 _JsonFmt/_JsonFastFmt 函数使用
 procedure _JsonFmt(const Format: RawUtf8; const Args, Params: array of const;
   Options: TDocVariantOptions; out Result: variant); overload;
 
@@ -2389,6 +3602,11 @@ procedure _JsonFmt(const Format: RawUtf8; const Args, Params: array of const;
 // properties can be slow - if you expect the data to be read-only or not
 // propagated into another place, add dvoValueCopiedByReference in Options
 // will increase the process speed a lot, or use _JsonFast()
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容
+// - 此全局函数是 TDocVariant.NewJson() 的别名，如果 JSON 内容正确转换为变体，则返回 TRUE
+// - 除了 JSON RFC 规范严格模式之外，此方法还将处理一些类似 BSON 的扩展，例如 不带引号的字段名称或 ObjectID()
+// - 默认情况下，每个内部值都会被复制，因此嵌套属性的访问可能会很慢 - 如果您希望数据是只读的或不传播到另一个地方，
+// 在选项中添加 dvoValueCopiedByReference 将大大提高处理速度 ，或使用 _JsonFast()
 function _Json(const Json: RawUtf8; var Value: variant;
   Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty]): boolean; overload;
 
@@ -2397,10 +3615,16 @@ function _Json(const Json: RawUtf8; var Value: variant;
 // ! Obj(NameValuePairs, JSON_FAST);
 // - so all created objects and arrays will be handled by reference, for best
 // speed - but you should better write on the resulting variant tree with caution
+/// 初始化一个变体实例来存储一些基于文档的对象内容
+// - 这个全局函数是一个方便的别名：
+//！ Obj(NameValuePairs, JSON_FAST);
+// - 因此，为了获得最佳速度，所有创建的对象和数组都将通过引用处理 - 但您最好小心地在生成的变体树上写入
 function _ObjFast(const NameValuePairs: array of const): variant; overload;
 
 /// initialize a variant instance to store any object as a TDocVariant
 // - is a wrapper around ObjectToVariant(aObject, result, aOptions)
+/// 初始化变体实例以将任何对象存储为 TDocVariant
+// - 是 ObjectToVariant(aObject, result, aOptions) 的包装
 function _ObjFast(aObject: TObject;
    aOptions: TTextWriterWriteObjectOptions = [woDontStoreDefault]): variant; overload;
   {$ifdef HASINLINE}inline;{$endif}
@@ -2410,6 +3634,10 @@ function _ObjFast(aObject: TObject;
 // ! _Array(Items, JSON_FAST);
 // - so all created objects and arrays will be handled by reference, for best
 // speed - but you should better write on the resulting variant tree with caution
+/// 初始化一个变体实例来存储一些基于文档的数组内容
+// - 这个全局函数是一个方便的别名：
+//！ _Array(项目, JSON_FAST);
+// - 因此，为了获得最佳速度，所有创建的对象和数组都将通过引用处理 - 但您最好小心地在生成的变体树上写入
 function _ArrFast(const Items: array of const): variant; overload;
 
 /// initialize a variant instance to store some document-based content
@@ -2423,6 +3651,13 @@ function _ArrFast(const Items: array of const): variant; overload;
 // handle some BSON-like extensions, e.g. unquoted field names or ObjectID()
 // - will handle only currency for floating point values to avoid precision
 // loss: use _JsonFastFloat() instead if you want to support double values
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容
+// - 这个全局函数是一个方便的别名：
+// ! _Json(JSON, JSON_FAST);
+// 因此，如果 JSON 内容不正确，它将返回未分配的变体
+// - 因此，为了获得最佳速度，所有创建的对象和数组都将通过引用处理 - 但您最好小心地在生成的变体树上写入
+// - 除了 JSON RFC 规范严格模式之外，此方法还将处理一些类似 BSON 的扩展，例如 不带引号的字段名称或 ObjectID()
+// - 将仅处理浮点值的货币以避免精度损失：如果您想支持双精度值，请使用 _JsonFastFloat()
 function _JsonFast(const Json: RawUtf8): variant;
 
 /// initialize a variant instance to store some document-based content
@@ -2430,10 +3665,15 @@ function _JsonFast(const Json: RawUtf8): variant;
 // - _JsonFast() will support only currency floats: use this method instead
 // if your JSON input is likely to require double values - with potential
 // precision loss
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容，并进行双重转换
+// - _JsonFast() 将仅支持货币浮动：如果您的 JSON 输入可能需要双精度值，则使用此方法 - 可能会导致精度损失
 function _JsonFastFloat(const Json: RawUtf8): variant;
 
 /// initialize a variant instance to store some extended document-based content
 // - this global function is an handy alias to:
+// ! _Json(JSON, JSON_FAST_EXTENDED);
+/// 初始化一个变体实例来存储一些扩展的基于文档的内容
+// - 这个全局函数是一个方便的别名：
 // ! _Json(JSON, JSON_FAST_EXTENDED);
 function _JsonFastExt(const Json: RawUtf8): variant;
 
@@ -2445,6 +3685,11 @@ function _JsonFastExt(const Json: RawUtf8): variant;
 // speed - but you should better write on the resulting variant tree with caution
 // - in addition to the JSON RFC specification strict mode, this method will
 // handle some BSON-like extensions, e.g. unquoted field names or ObjectID():
+/// 初始化变体实例以存储来自提供的（扩展）JSON 内容的一些基于文档的内容，并带有参数格式
+// - 这个全局函数是一个方便的别名，例如 到：
+// ! aVariant := _JsonFmt('{%:{$in:[?,?]}}',['type'],['food','snack'], JSON_FAST);
+// - 因此，为了获得最佳速度，所有创建的对象和数组都将通过引用处理 - 但您最好小心地在生成的变体树上写入
+// - 除了 JSON RFC 规范严格模式之外，此方法还将处理一些类似 BSON 的扩展，例如 不带引号的字段名称或 ObjectID()：
 function _JsonFastFmt(const Format: RawUtf8;
    const Args, Params: array of const): variant;
 
@@ -2459,6 +3704,12 @@ function _JsonFastFmt(const Format: RawUtf8;
 // per-value copy may be time and resource consuming, but will be also safe
 // - will raise an EDocVariant if the supplied variant is not a TDocVariant or
 // a varByRef pointing to a TDocVariant
+/// 确保基于文档的变体实例仅具有每个值嵌套对象或数组文档
+// - 只是一个包装：
+// ! TDocVariantData(DocVariant).InitCopy(DocVariant, JSON_[mDefault])
+// - 您可以使用此函数来确保此变体的所有内部属性都将按值复制，无论嵌套对象或数组是使用什么选项创建的
+// - 对于具有大深度嵌套对象或数组的大型文档，完整的每个值复制可能会消耗时间和资源，但也很安全
+// - 如果提供的变体不是 TDocVariant 或指向 TDocVariant 的 varByRef，则将引发 EDocVariant
 procedure _Unique(var DocVariant: variant);
 
 /// ensure a document-based variant instance will have only per-value nested
@@ -2473,6 +3724,12 @@ procedure _Unique(var DocVariant: variant);
 // of the resulting value will be per-reference, so will be almost instant
 // - will raise an EDocVariant if the supplied variant is not a TDocVariant or
 // a varByRef pointing to a TDocVariant
+/// 确保基于文档的变体实例仅具有每个值嵌套对象或数组文档
+// - 只是一个包装：
+// ! TDocVariantData(DocVariant).InitCopy(DocVariant, JSON_FAST)
+// - 您可以使用此函数来确保此变体的所有内部属性都将按引用复制，无论嵌套对象或数组是使用什么选项创建的
+// - 对于具有大深度嵌套对象或数组的大型文档，它将首先创建文档节点的完整副本，但结果值的进一步分配将是针对每个引用的，因此几乎是即时的
+// - 如果提供的变体不是 TDocVariant 或指向 TDocVariant 的 varByRef，则将引发 EDocVariant
 procedure _UniqueFast(var DocVariant: variant);
 
 /// return a full nested copy of a document-based variant instance
@@ -2487,6 +3744,12 @@ procedure _UniqueFast(var DocVariant: variant);
 // consider using _ByRef() instead if a fast copy-by-reference is enough
 // - will raise an EDocVariant if the supplied variant is not a TDocVariant or
 // a varByRef pointing to a TDocVariant
+/// 返回基于文档的变体实例的完整嵌套副本
+// - 只是一个包装：
+// ! TDocVariant.NewUnique(DocVariant,JSON_[mDefault])
+// - 您可以使用此函数来确保此变体的所有内部属性都将按值复制，无论创建嵌套对象或数组时使用什么选项：用于以 varByRef 返回的值（例如，通过 _() 伪值） -方法）
+// - 对于具有大深度嵌套对象或数组的大型文档，完整的按值复制可能会消耗时间和资源，但也很安全 - 如果需要快速按引用复制，请考虑使用 _ByRef() 足够的
+// - 如果提供的变体不是 TDocVariant 或指向 TDocVariant 的 varByRef，则将引发 EDocVariant
 function _Copy(const DocVariant: variant): variant;
 
 /// return a full nested copy of a document-based variant instance
@@ -2501,12 +3764,21 @@ function _Copy(const DocVariant: variant): variant;
 // consider using _ByRef() instead if a fast copy-by-reference is enough
 // - will raise an EDocVariant if the supplied variant is not a TDocVariant or
 // a varByRef pointing to a TDocVariant
+/// 返回基于文档的变体实例的完整嵌套副本
+// - 只是一个包装：
+// ! TDocVariant.NewUnique(DocVariant, JSON_FAST)
+// - 您可以使用此函数来确保此变体的所有内部属性都将按值复制，无论创建嵌套对象或数组时使用什么选项：用于以 varByRef 返回的值（例如，通过 _() 伪值） -方法）
+// - 对于具有大深度嵌套对象或数组的大型文档，完整的按值复制可能会消耗时间和资源，但也很安全 - 如果需要快速按引用复制，请考虑使用 _ByRef() 足够的
+// - 如果提供的变体不是 TDocVariant 或指向 TDocVariant 的 varByRef，则将引发 EDocVariant
 function _CopyFast(const DocVariant: variant): variant;
 
 /// copy a TDocVariant to another variable, changing the options on the fly
 // - note that the content (items or properties) is copied by reference,
 // so consider using _Copy() instead if you expect to safely modify its content
 // - will return null if the supplied variant is not a TDocVariant
+/// 将 TDocVariant 复制到另一个变量，动态更改选项
+// - 请注意，内容（项目或属性）是通过引用复制的，因此如果您希望安全地修改其内容，请考虑使用 _Copy()
+// - 如果提供的变体不是 TDocVariant，将返回 null
 function _ByRef(const DocVariant: variant;
    Options: TDocVariantOptions): variant; overload;
 
@@ -2514,6 +3786,9 @@ function _ByRef(const DocVariant: variant;
 // - note that the content (items or properties) is copied by reference,
 // so consider using _Copy() instead if you expect to safely modify its content
 // - will return null if the supplied variant is not a TDocVariant
+/// 将 TDocVariant 复制到另一个变量，动态更改选项
+// - 请注意，内容（项目或属性）是通过引用复制的，因此如果您希望安全地修改其内容，请考虑使用 _Copy()
+// - 如果提供的变体不是 TDocVariant，将返回 null
 procedure _ByRef(const DocVariant: variant; out Dest: variant;
   Options: TDocVariantOptions); overload;
 
@@ -2522,6 +3797,10 @@ procedure _ByRef(const DocVariant: variant; out Dest: variant;
 // - returns '' if the supplied value is neither a TDocVariant or a string
 // - could be used e.g. to store either a JSON CSV string or a JSON array of
 // strings in a settings property
+/// 将 TDocVariantData 数组或字符串值转换为 CSV
+// - 将调用 TDocVariantData.ToCsv，或返回字符串
+// - 如果提供的值既不是 TDocVariant 也不是字符串，则返回 ''
+// - 可以使用，例如 在设置属性中存储 JSON CSV 字符串或 JSON 字符串数组
 function _Csv(const DocVariantOrString: variant): RawUtf8;
 
 /// will convert any TObject into a TDocVariant document instance
@@ -2530,11 +3809,18 @@ function _Csv(const DocVariantOrString: variant): RawUtf8;
 // is done by this function
 // - would be used e.g. by VarRecToVariant() function
 // - if you expect lazy-loading of a TObject, see TObjectVariant.New()
+/// 将任何 TObject 转换为 TDocVariant 文档实例
+// - _ObjFast(Value) 使用的快速处理函数
+// - 请注意，结果变量应该已经被清除：此函数没有执行 VarClear()
+// - 将被使用，例如 通过 VarRecToVariant() 函数
+// - 如果您希望延迟加载 TObject，请参阅 TObjectVariant.New()
 procedure ObjectToVariant(Value: TObject; var result: variant;
   Options: TTextWriterWriteObjectOptions = [woDontStoreDefault]); overload;
 
 /// will convert any TObject into a TDocVariant document instance
 // - convenient overloaded function to include woEnumSetsAsText option
+/// 将任何 TObject 转换为 TDocVariant 文档实例
+// - 方便的重载函数包含 woEnumSetsAsText 选项
 function ObjectToVariant(Value: TObject; EnumSetsAsText: boolean): variant; overload;
 
 /// will serialize any TObject into a TDocVariant debugging document
@@ -2542,41 +3828,56 @@ function ObjectToVariant(Value: TObject; EnumSetsAsText: boolean): variant; over
 // "Context":"..." text message
 // - if the supplied context format matches '{....}' then it will be added
 // as a corresponding TDocVariant JSON object
+/// 将任何 TObject 序列化为 TDocVariant 调试文档
+// - 只是 _JsonFast(ObjectToJsonDebug()) 的包装，带有可选的 "Context":"..." 文本消息
+// - 如果提供的上下文格式与 '{....}' 匹配，那么它将被添加为相应的 TDocVariant JSON 对象
 function ObjectToVariantDebug(Value: TObject;
   const ContextFormat: RawUtf8; const ContextArgs: array of const;
   const ContextName: RawUtf8 = 'context'): variant; overload;
 
 /// get the enumeration names corresponding to a set value, as a JSON array
+/// 获取与设置值对应的枚举名称，作为 JSON 数组
 function SetNameToVariant(Value: cardinal; Info: TRttiCustom;
   FullSetsAsStar: boolean = false): variant; overload;
 
 /// get the enumeration names corresponding to a set value, as a JSON array
+/// 获取与设置值对应的枚举名称，作为 JSON 数组
 function SetNameToVariant(Value: cardinal; Info: PRttiInfo;
   FullSetsAsStar: boolean = false): variant; overload;
 
 /// fill a class instance from a TDocVariant object document properties
 // - returns FALSE if the variant is not a dvObject, TRUE otherwise
+/// 从 TDocVariant 对象文档属性中填充类实例
+// - 如果变体不是 dvObject，则返回 FALSE，否则返回 TRUE
 function DocVariantToObject(var doc: TDocVariantData; obj: TObject;
   objRtti: TRttiCustom = nil): boolean;
 
 /// fill a T*ObjArray variable from a TDocVariant array document values
 // - will always erase the T*ObjArray instance, and fill it from arr values
+/// 从 TDocVariant 数组文档值填充 T*ObjArray 变量
+// - 将始终删除 T*ObjArray 实例，并从 arr 值填充它
 procedure DocVariantToObjArray(var arr: TDocVariantData; var objArray;
   objClass: TClass);
 
 /// will convert a blank TObject into a TDocVariant document instance
+/// 将空白 TObject 转换为 TDocVariant 文档实例
 function ObjectDefaultToVariant(aClass: TClass;
   aOptions: TDocVariantOptions): variant; overload;
 
 
 
 { ************** JSON Parsing into Variant }
+{ ************** JSON 解析为变体 }
 
 /// low-level function to set a variant from an unescaped JSON number or string
 // - expect the JSON input buffer to be already unescaped and #0 terminated,
 // e.g. by TGetJsonField, and having set properly the wasString flag
 // - set the varString or call GetVariantFromNotStringJson() if TryCustomVariants=nil
 // - or call GetJsonToAnyVariant() to support TryCustomVariants^ complex input
+/// 从未转义的 JSON 数字或字符串设置变体的低级函数
+// - 期望 JSON 输入缓冲区已经未转义并且 #0 终止，例如 通过 TGetJsonField，并正确设置 wasString 标志
+// - 如果 TryCustomVariants=nil，则设置 varString 或调用 GetVariantFromNotStringJson()
+// - 或调用 GetJsonToAnyVariant() 以支持 TryCustomVariants^ 复杂输入
 procedure GetVariantFromJsonField(Json: PUtf8Char; wasString: boolean;
   var Value: variant; TryCustomVariants: PDocVariantOptions = nil;
   AllowDouble: boolean = false; JsonLen: integer = 0);
@@ -2588,6 +3889,11 @@ procedure GetVariantFromJsonField(Json: PUtf8Char; wasString: boolean;
 // - will recognize null, boolean, integer, Int64, currency, double
 // (if AllowDouble is true) input, then set Value and return TRUE
 // - returns FALSE if the supplied input has no expected JSON format
+/// 用于设置未转义 JSON 非字符串变体的低级函数
+// - 期望 JSON 输入缓冲区已经未转义并且 #0 终止，例如 通过 TGetJsonField，并返回 wasString=false
+// - 被称为例如 通过函数 GetVariantFromJsonField()
+// - 将识别 null、boolean、integer、Int64、currency、double（如果 AllowDouble 为 true）输入，然后设置 Value 并返回 TRUE
+// - 如果提供的输入没有预期的 JSON 格式，则返回 FALSE
 function GetVariantFromNotStringJson(Json: PUtf8Char;
   var Value: TVarData; AllowDouble: boolean): boolean;
   {$ifdef HASINLINE}inline;{$endif}
@@ -2603,11 +3909,18 @@ function GetVariantFromNotStringJson(Json: PUtf8Char;
 // (e.g. @JSON_[mFast] for fast instance) and input is a known object or
 // array, either encoded as strict-JSON (i.e. {..} or [..]), or with some
 // extended (e.g. BSON) syntax
+/// 将 JSON 缓冲区内容解析为变体的低级函数
+// - 警告：将在 Json 缓冲区内存本身中进行解码（无内存分配或复制），以加快处理速度 - 因此请注意它不被共享
+// - VariantLoadJson()、GetVariantFromJsonField() 和 TDocVariantData.InitJson() 使用的内部方法
+// - 将实例化整数、Int64、货币、双精度或字符串值（如 RawUtf8），根据文本内容猜测最佳数字类型，
+// 并在所有其他情况下实例化字符串，除了 TryCustomVariants 指向某些选项（例如 @JSON_ [mFast] 用于快速实例），
+// 输入是已知对象或数组，编码为严格 JSON（即 {..} 或 [..]），或使用某些扩展（例如 BSON）语法
 procedure JsonToAnyVariant(var Value: variant; var Info: TGetJsonField;
   Options: PDocVariantOptions; AllowDouble: boolean = false);
 
 {$ifndef PUREMORMOT2}
 /// low-level function to parse a JSON content into a variant
+/// 将 JSON 内容解析为变体的低级函数
 procedure GetJsonToAnyVariant(var Value: variant; var Json: PUtf8Char;
   EndOfObject: PUtf8Char; Options: PDocVariantOptions; AllowDouble: boolean);
     overload; {$ifdef HASINLINE}inline;{$endif}
@@ -2616,6 +3929,9 @@ procedure GetJsonToAnyVariant(var Value: variant; var Json: PUtf8Char;
 /// identify either varInt64, varDouble, varCurrency types following JSON format
 // - any non valid number is returned as varString
 // - warning: supplied JSON is expected to be not nil
+/// 识别遵循 JSON 格式的 varInt64、varDouble、varCurrency 类型
+// - 任何无效数字都作为 varString 返回
+// - 警告：提供的 JSON 预计不为零
 function TextToVariantNumberType(Json: PUtf8Char): cardinal;
 
 /// identify either varInt64 or varCurrency types following JSON format
@@ -2625,6 +3941,11 @@ function TextToVariantNumberType(Json: PUtf8Char): cardinal;
 // textual representation, without digit truncation due to limited precision
 // - any non valid number is returned as varString
 // - warning: supplied JSON is expected to be not nil
+/// 识别遵循 JSON 格式的 varInt64 或 varCurrency 类型
+// - 此版本不会返回 varDouble，即不会处理超过 4 位精确小数（如 varCurrency），也不会处理带指数的科学记数法 (1.314e10)
+// - 这将确保任何传入的 JSON 都将转换回其精确的文本表示形式，而不会由于精度有限而导致数字截断
+// - 任何无效数字都作为 varString 返回
+// - 警告：提供的 JSON 预计不为零
 function TextToVariantNumberTypeNoDouble(Json: PUtf8Char): cardinal;
 
 /// low-level function to parse a variant from an unescaped JSON number
@@ -2635,23 +3956,36 @@ function TextToVariantNumberTypeNoDouble(Json: PUtf8Char): cardinal;
 // - matches TextToVariantNumberType/TextToVariantNumberTypeNoDouble() logic
 // - see GetVariantFromNotStringJson() to check the whole Json input, and
 // parse null/false/true values
+/// 从未转义的 JSON 数字解析变体的低级函数
+// - 返回数字后面的位置，并将 Value 设置为 varInteger/varInt64/varCurrency 类型的变体（如果 AllowVarDouble 为 true，则设置为 varDouble）
+// - 如果 JSON 无法转换为数字，则返回 nil - 它可能是一个字符串
+// - 如果AllowVarDouble为假，则仅处理最多4位小数（即货币）
+// - 匹配 TextToVariantNumberType/TextToVariantNumberTypeNoDouble() 逻辑
+// - 请参阅 GetVariantFromNotStringJson() 检查整个 Json 输入，并解析 null/false/true 值
 function GetNumericVariantFromJson(Json: PUtf8Char;
   var Value: TVarData; AllowVarDouble: boolean): PUtf8Char;
 
 /// convert some UTF-8 into a variant, detecting JSON numbers or constants
 // - first try GetVariantFromNotStringJson() then fallback to RawUtf8ToVariant()
+/// 将一些 UTF-8 转换为变体，检测 JSON 数字或常量
+// - 首先尝试 GetVariantFromNotStringJson() 然后回退到 RawUtf8ToVariant()
 procedure TextToVariant(const aValue: RawUtf8; AllowVarDouble: boolean;
   out aDest: variant);
 
 /// convert some UTF-8 text buffer into a variant, with string interning
 // - similar to TextToVariant(), but with string interning (if Interning<>nil)
 // - first try GetVariantFromNotStringJson() then fallback to RawUtf8ToVariant()
+/// 将一些 UTF-8 文本缓冲区转换为带有字符串驻留的变体
+// - 与 TextToVariant() 类似，但具有字符串驻留（如果 Interning<>nil）
+// - 首先尝试 GetVariantFromNotStringJson() 然后回退到 RawUtf8ToVariant()
 procedure UniqueVariant(Interning: TRawUtf8Interning;
   var aResult: variant; aText: PUtf8Char; aTextLen: PtrInt;
   aAllowVarDouble: boolean = false); overload;
 
 /// convert the next CSV item into a variant number or RawUtf8 varString
 // - just a wrapper around GetNextItem() + TextToVariant()
+/// 将下一个 CSV 项目转换为变体编号或 RawUtf8 varString
+// - 只是 GetNextItem() + TextToVariant() 的包装
 function GetNextItemToVariant(var P: PUtf8Char;
   out Value: Variant; Sep: AnsiChar = ','; AllowDouble: boolean = true): boolean;
 
@@ -2659,12 +3993,18 @@ function GetNextItemToVariant(var P: PUtf8Char;
 // - follows TJsonWriter.AddVariant() format (calls GetJsonToAnyVariant)
 // - make a temporary copy before parsing - use GetJsonToAnyVariant() on a buffer
 // - return true and set Value on success, or false and empty Value on error
+/// 从 JSON 数字或字符串中检索变体值
+// - 遵循 TJsonWriter.AddVariant() 格式（调用 GetJsonToAnyVariant）
+// - 在解析之前制作临时副本 - 在缓冲区上使用 GetJsonToAnyVariant()
+// - 成功时返回 true 并设置 Value，错误时返回 false 并设置为空 Value
 function VariantLoadJson(var Value: Variant; const Json: RawUtf8;
   TryCustomVariants: PDocVariantOptions = nil;
   AllowDouble: boolean = false): boolean; overload;
 
 /// retrieve a variant value from a JSON number or string
 // - just wrap VariantLoadJson(Value,Json...) procedure as a function
+/// 从 JSON 数字或字符串中检索变体值
+// - 只需将 VariantLoadJson(Value,Json...) 过程包装为函数
 function VariantLoadJson(const Json: RawUtf8;
   TryCustomVariants: PDocVariantOptions = nil;
   AllowDouble: boolean = false): variant; overload;
@@ -2672,12 +4012,15 @@ function VariantLoadJson(const Json: RawUtf8;
 
 /// just a wrapper around VariantLoadJson() with some TDocVariantOptions
 // - make a temporary copy of the input Json before parsing
+/// 只是 VariantLoadJson() 的包装，带有一些 TDocVariantOptions
+// - 在解析之前制作输入 Json 的临时副本
 function JsonToVariant(const Json: RawUtf8;
   Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty];
   AllowDouble: boolean = false): variant;
   {$ifdef HASINLINE} inline; {$endif}
 
 /// just a wrapper around GetJsonToAnyVariant() with some TDocVariantOptions
+/// 只是 GetJsonToAnyVariant() 的包装，带有一些 TDocVariantOptions
 function JsonToVariantInPlace(var Value: Variant; Json: PUtf8Char;
   Options: TDocVariantOptions = [dvoReturnNullForUnknownProperty];
   AllowDouble: boolean = false): PUtf8Char;
@@ -2688,11 +4031,16 @@ function JsonToVariantInPlace(var Value: Variant; Json: PUtf8Char;
 // - decoded sections are encoded as Doc JSON object with its textual values,
 // or with nested objects, if the data was supplied as binary:
 // ! {"name1":{"data":..,"filename":...,"contenttype":...},"name2":...}
+/// 将 multipart/form-data POST 请求内容解码为 TDocVariantData
+// - 遵循 RFC 1867
+// - 解码后的部分使用其文本值或嵌套对象编码为 Doc JSON 对象（如果数据以二进制形式提供）：
+// ! {"name1":{"data":..,"filename":...,"contenttype":...},"name2":...}
 procedure MultiPartToDocVariant(const MultiPart: TMultiPartDynArray;
   var Doc: TDocVariantData; Options: PDocVariantOptions = nil);
 
 
 { ************** Variant Binary Serialization }
+{ ************** 变体二进制序列化 }
 
 {$ifndef PUREMORMOT2}
 
@@ -2700,6 +4048,9 @@ procedure MultiPartToDocVariant(const MultiPart: TMultiPartDynArray;
 // using the VariantSave() function
 // - will return 0 in case of an invalid (not handled) Variant type
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 使用 VariantSave() 函数计算保存 Variant 内容所需的字节数
+// - 如果 Variant 类型无效（未处理），将返回 0
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function VariantSaveLength(const Value: variant): integer; deprecated;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -2714,6 +4065,13 @@ function VariantSaveLength(const Value: variant): integer; deprecated;
 // itself: using this function between UNICODE and NOT UNICODE
 // versions of Delphi, will propably fail - you have been warned!
 // - deprecated function - use overloaded BinarySave() functions instead
+/// 将 Variant 内容保存到目标内存缓冲区中
+// - Dest 的长度必须至少为 VariantSaveLength() 个字节
+// - 将处理标准 Variant 类型和自定义类型（序列化为 JSON）
+// - 如果 Variant 类型无效（未处理），将返回 nil
+// - 将使用专有的二进制格式，并对字符串长度进行一些可变长度编码
+// - 警告：将像变体类型本身一样对通用字符串字段进行编码：在 Delphi 的 UNICODE 和 NOT UNICODE 版本之间使用此函数，可能会失败 - 您已被警告！
+// - 已弃用的函数 - 使用重载的 BinarySave() 函数代替
 function VariantSave(const Value: variant; Dest: PAnsiChar): PAnsiChar;
   overload; deprecated;   {$ifdef HASINLINE}inline;{$endif}
 
@@ -2727,6 +4085,12 @@ function VariantSave(const Value: variant; Dest: PAnsiChar): PAnsiChar;
 // itself: using this function between UNICODE and NOT UNICODE
 // versions of Delphi, will propably fail - you have been warned!
 // - is a wrapper around BinarySave(rkVariant)
+/// 将 Variant 内容保存到二进制缓冲区中
+// - 将处理标准 Variant 类型和自定义类型（序列化为 JSON）
+// - 如果 Variant 类型无效（未处理），将返回 ''
+// - 只是 VariantSaveLength()+VariantSave() 的包装
+// - 警告：将像变体类型本身一样对通用字符串字段进行编码：在 Delphi 的 UNICODE 和 NOT UNICODE 版本之间使用此函数，可能会失败 - 您已被警告！
+// - 是 BinarySave(rkVariant) 的包装
 function VariantSave(const Value: variant): RawByteString; overload;
   {$ifdef HASINLINE}inline;{$endif}
 
@@ -2737,6 +4101,12 @@ function VariantSave(const Value: variant): RawByteString; overload;
 // read content
 // - how custom type variants are created can be defined via CustomVariantOptions
 // - is a wrapper around BinaryLoad(rkVariant)
+/// 从我们优化的二进制序列化格式中检索变体值
+// - 遵循 RecordLoad() 或 VariantSave() 函数使用的数据布局
+// - 如果源缓冲区不正确则返回 nil
+// - 如果成功，则返回读取内容之后的内存缓冲区指针
+// - 如何创建自定义类型变体可以通过 CustomVariantOptions 定义
+// - 是 BinaryLoad(rkVariant) 的包装器
 function VariantLoad(var Value: variant; Source: PAnsiChar;
   CustomVariantOptions: PDocVariantOptions;
   SourceMax: PAnsiChar {$ifndef PUREMORMOT2} = nil {$endif}): PAnsiChar; overload;
@@ -2747,6 +4117,12 @@ function VariantLoad(var Value: variant; Source: PAnsiChar;
 // - just a wrapper around VariantLoad()
 // - how custom type variants are created can be defined via CustomVariantOptions
 // - is a wrapper around BinaryLoad(rkVariant)
+/// 从我们优化的二进制序列化格式中检索变体值
+// - 遵循 RecordLoad() 或 VariantSave() 函数使用的数据布局
+// - 如果源缓冲区不正确，则返回 varEmpty
+// - 只是 VariantLoad() 的包装
+// - 如何创建自定义类型变体可以通过 CustomVariantOptions 定义
+// - 是 BinaryLoad(rkVariant) 的包装器
 function VariantLoad(const Bin: RawByteString;
   CustomVariantOptions: PDocVariantOptions): variant; overload;
   {$ifdef HASINLINE}inline;{$endif}
@@ -2755,6 +4131,10 @@ function VariantLoad(const Bin: RawByteString;
 // - matches TFileBufferWriter.Write()
 // - how custom type variants are created can be defined via CustomVariantOptions
 // - is just a wrapper around VariantLoad/BinaryLoad
+/// 从可变长度缓冲区中检索变体值
+// - 匹配 TFileBufferWriter.Write()
+// - 如何创建自定义类型变体可以通过 CustomVariantOptions 定义
+// - 只是 VariantLoad/BinaryLoad 的包装
 procedure FromVarVariant(var Source: PByte; var Value: variant;
   CustomVariantOptions: PDocVariantOptions; SourceMax: PByte);
   {$ifdef HASINLINE}inline;{$endif}
@@ -2764,6 +4144,7 @@ implementation
 
 
 { ************** Low-Level Variant Wrappers }
+{ ************** 低级变体包装器 }
 
 function VarIs(const V: Variant; const VTypes: TVarDataTypes): boolean;
 var
@@ -2839,7 +4220,7 @@ procedure SetVariantByRef(const Source: Variant; var Dest: Variant);
 var
   vt: cardinal;
 begin
-  if PInteger(@Dest)^ <> 0 then // VarClear() is not always inlined :(
+  if PInteger(@Dest)^ <> 0 then // VarClear() is not always inlined :(  （VarClear() 并不总是内联:(）
     VarClear(Dest);
   vt := TVarData(Source).VType;
   if ((vt and varByRef) <> 0) or
@@ -2861,7 +4242,7 @@ var
   ct: TSynInvokeableVariantType;
 begin
   s := @Source;
-  if PInteger(@Dest)^ <> 0 then // VarClear() is not always inlined :(
+  if PInteger(@Dest)^ <> 0 then // VarClear() is not always inlined :(  （VarClear() 并不总是内联:(）
     VarClear(Dest);
   vt := s^.VType;
   while vt = varVariantByRef do
@@ -2946,7 +4327,7 @@ begin
           WideString(V^.VAny) := ''
         else
           goto clr; // varError/varDispatch
-    end // note: varVariant/varUnknown are not handled because should not appear
+    end // note: varVariant/varUnknown are not handled because should not appear  （注意：varVariant/varUnknown 不被处理，因为不应该出现）
     else if vt = varString then
       {$ifdef FPC}
       FastAssignNew(V^.VAny)
@@ -5173,6 +6554,14 @@ begin
     until n = 0;
   end;
 end;
+
+{ Some numbers on Linux x86_64:
+    TDocVariant exp in 135.36ms i.e. 1.1M/s, 144.8 MB/s
+    TDocVariant exp no guess in 139.10ms i.e. 1.1M/s, 140.9 MB/s
+    TDocVariant exp dvoIntern in 139.19ms i.e. 1.1M/s, 140.8 MB/s
+    TDocVariant FromResults exp in 60.86ms i.e. 2.5M/s, 322 MB/s
+    TDocVariant FromResults not exp in 47ms i.e. 3.3M/s, 183.4 MB/s
+}
 
 function TDocVariantData.InitArrayFromResults(Json: PUtf8Char; JsonLen: PtrInt;
   aOptions: TDocVariantOptions): boolean;
@@ -8105,7 +9494,7 @@ procedure _JsonFmt(const Format: RawUtf8; const Args, Params: array of const;
 var
   temp: RawUtf8;
 begin
-  FormatParams(Format, Args, Params, {json=}true, temp);
+  temp := FormatUtf8(Format, Args, Params, true);
   if TDocVariantData(Result).InitJsonInPlace(pointer(temp), Options) = nil then
     TDocVariantData(Result).ClearFast;
 end;
@@ -8945,7 +10334,7 @@ begin
             ct := DocVariantType; // recognize our TDocVariant
             if t = ct.VarType then
               goto direct;
-            ct := LastDispInvoke; // atomic pointer load
+            ct := LastDispInvoke; // atomic load
             if (ct <> nil) and
                (ct.VarType = t) then
               // most calls are grouped within the same custom variant type
