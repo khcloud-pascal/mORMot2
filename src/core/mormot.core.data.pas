@@ -1,4 +1,5 @@
 
+
 /// Framework Core Low-Level Data Processing Functions
 // - this unit is a part of the Open Source Synopse mORMot framework 2,
 // licensed under a MPL/GPL/LGPL three license - see LICENSE.md
@@ -2455,16 +2456,34 @@ type
     // - can use an associated TRawUtf8Interning instance for RawUtf8 values
     // - warning: the content of P^ will be modified during parsing: make a
     // local copy if it will be needed later (using e.g. the overloaded method)
+    /// 从 UTF-8 编码的 JSON 缓冲区加载动态数组内容
+     // - 期望 TTextWriter.AddDynArrayJson 方法保存的格式，即处理 TbooleanDynArray、TIntegerDynArray、TInt64DynArray、TCardinalDynArray，
+     // TDoubleDynArray、TCurrencyDynArray、TWordDynArray、TByteDynArray、
+     // TRawUtf8DynArray, TWinAnsiDynArray, TRawByteStringDynArray,
+     // TStringDynArray, TWideStringDynArray, TSynUnicodeDynArray,
+     // TTimeLogDynArray 和 TDateTimeDynArray 作为 JSON 数组 - 或任何自定义的 Rtti.RegisterFromText/TRttiJson.RegisterCustomSerializer 格式
+     // - 或任何其他类型的数组作为通过 JSON_BASE64_MAGIC_C 处理的 Base64 编码二进制流（UTF-8 编码 \uFFF0 特殊代码）
+     // - 典型的处理内容可能是
+     // ! '[1,2,3,4]' or '["\uFFF0base64encodedbinary"]'
+     // - 在从 P 读取的数据末尾返回一个指针，如果输入缓冲区无效，则返回 nil
+     // - 此方法将识别 T*ObjArray 类型，并在反序列化之前首先释放任何现有实例，以避免内存泄漏
+     // - 设置例如 @JSON_[mFast] 作为 CustomVariantOptions 参数，用于将复杂的 JSON 对象或数组作为 TDocVariant 处理到变体字段中
+     // - 可以将关联的 TRawUtf8Interning 实例用于 RawUtf8 值
+     // - 警告：P^ 的内容将在解析过程中被修改：如果稍后需要，请制作本地副本（例如使用重载方法）
     function LoadFromJson(P: PUtf8Char; EndOfObject: PUtf8Char = nil;
       CustomVariantOptions: PDocVariantOptions = nil; Tolerant: boolean = false;
       Interning: TRawUtf8InterningAbstract = nil): PUtf8Char; overload;
     /// load the dynamic array content from an UTF-8 encoded JSON buffer
     // - this method will make a private copy of the JSON for in-place parsing
     // - returns false in case of invalid input buffer, true on success
+    /// 从 UTF-8 编码的 JSON 缓冲区加载动态数组内容
+     // - 此方法将创建 JSON 的私有副本以进行就地解析
+     // - 如果输入缓冲区无效则返回 false，如果成功则返回 true
     function LoadFromJson(const Json: RawUtf8;
       CustomVariantOptions: PDocVariantOptions = nil; Tolerant: boolean = false;
       Interning: TRawUtf8InterningAbstract = nil): boolean; overload;
     ///  select a sub-section (slice) of a dynamic array content
+    /// 选择动态数组内容的子部分（切片）
     procedure Slice(var Dest; Limit: cardinal; Offset: cardinal = 0);
     /// assign the current dynamic array content into a variable
     // - by default (Offset=Limit=0), the whole array is set with no memory
@@ -2472,6 +2491,14 @@ type
     // force the internal length/Capacity to equal Count
     // - Offset/Limit could be used to create a new dynamic array with some part
     // of the existing content (Offset<0 meaning from the end):
+    // ! SliceAsDynArray(DA);         // items 0..Count-1 (assign with refcount)
+    // ! SliceAsDynArray(DA, 10);     // items 10..Count-1
+    // ! SliceAsDynArray(DA, 0, 10);  // first 0..9 items
+    // ! SliceAsDynArray(DA, 10, 20); // items 10..29 - truncated if Count < 20
+    // ! SliceAsDynArray(DA, -10);    // last Count-10..Count-1 items
+    /// 将当前动态数组内容赋给变量
+     // - 默认情况下（Offset=Limit=0），整个数组设置为没有内存（重新）分配，只需最终确定 Dest 槽，然后创建 Inc(RefCnt) 并强制内部长度/容量等于 Count
+     // - Offset/Limit 可用于创建一个新的动态数组，其中包含现有内容的某些部分（Offset<0 表示从末尾开始）：
     // ! SliceAsDynArray(DA);         // items 0..Count-1 (assign with refcount)
     // ! SliceAsDynArray(DA, 10);     // items 10..Count-1
     // ! SliceAsDynArray(DA, 0, 10);  // first 0..9 items
@@ -2487,6 +2514,10 @@ type
     // - you can specify the start index and the number of items to take from
     // the source dynamic array (leave as -1 to add till the end)
     // - returns the number of items added to the array
+    /// 从给定的动态数组变量添加项目
+     // - 提供的源 DynArray 必须与当前用于此 TDynArray 的类型完全相同 - 警告：在此处传递对“数组...”变量的引用，而不是另一个 TDynArray 实例； 如果您想添加另一个 TDynArray，请使用 AddDynArray() 方法
+     // - 您可以指定起始索引和从源动态数组中获取的项目数（保留为 -1 以添加到末尾）
+     // - 返回添加到数组中的项目数
     function AddArray(const DynArrayVar; aStartIndex: integer = 0;
       aCount: integer = -1): integer;
     /// add items from a given TDynArray
@@ -2494,12 +2525,18 @@ type
     // current used for this TDynArray, otherwise it won't do anything
     // - you can specify the start index and the number of items to take from
     // the source dynamic array (leave as -1 to add till the end)
+    /// 从给定的 TDynArray 添加项目
+     // - 提供的源 TDynArray 必须与当前用于此 TDynArray 的类型完全相同，否则它不会执行任何操作
+     // - 您可以指定起始索引和从源动态数组中获取的项目数（保留为 -1 以添加到末尾）
     procedure AddDynArray(aSource: PDynArray; aStartIndex: integer = 0;
       aCount: integer = -1);
     /// compare the content of the two arrays, returning TRUE if both match
     // - use any supplied Compare property (unless ignorecompare=true), or
     // following the RTTI element description on all array items
     // - T*ObjArray kind of arrays will properly compare their properties
+    /// 比较两个数组的内容，如果匹配则返回 TRUE
+     // - 使用任何提供的 Compare 属性（除非ignorecompare=true），或遵循所有数组项的 RTTI 元素描述
+     // - T*ObjArray 类型的数组将正确比较它们的属性
     function Equals(B: PDynArray; IgnoreCompare: boolean = false;
       CaseSensitive: boolean = true): boolean;
       {$ifdef HASINLINE}inline;{$endif}
@@ -2507,12 +2544,18 @@ type
     // - use any supplied Compare property (unless ignorecompare=true), or
     // following the RTTI element description on all array items
     // - T*ObjArray kind of arrays will properly compare their properties
+    /// 比较两个数组的内容
+     // - 使用任何提供的 Compare 属性（除非ignorecompare=true），或遵循所有数组项的 RTTI 元素描述
+     // - T*ObjArray 类型的数组将正确比较它们的属性
     function Compares(B: PDynArray; IgnoreCompare: boolean = false;
       CaseSensitive: boolean = true): integer;
     /// set all content of one dynamic array to the current array
     // - both must be of the same exact type
     // - T*ObjArray will be reallocated and copied by content (using a temporary
     // JSON serialization), unless ObjArrayByRef is true and pointers are copied
+    /// 将一个动态数组的所有内容设置为当前数组
+     // - 两者必须具有完全相同的类型
+     // - T*ObjArray 将按内容重新分配和复制（使用临时 JSON 序列化），除非 ObjArrayByRef 为 true 并且复制指针
     procedure Copy(Source: PDynArray; ObjArrayByRef: boolean = false);
     /// set all content of one dynamic array to the current array
     // - both must be of the same exact type
@@ -12224,5 +12267,8 @@ initialization
   InitializeUnit;
 
 end.
+
+
+
 
 
