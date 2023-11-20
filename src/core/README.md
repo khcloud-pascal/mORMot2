@@ -247,4 +247,116 @@ An (optional) Multi-thread Friendly Memory Manager for FPC written in x86_64 ass
 - lockless round-robin of tiny blocks (<=128/256 bytes) for better scaling
 - optional lockless bin list to avoid freemem() thread contention
 - three app modes: default mono-thread friendly, `FPCMM_SERVER` or `FPCMM_BOOST`
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+===========================================================<br/>
+# ** 中文翻译 ** 
 
+
+# mORMot 核心单元
+
+## 文件夹内容
+
+此文件夹托管 *mORMot* 开源框架版本 2 的核心单元。
+
+## 核心单元
+
+对于“核心单元”，我们指的是实现我们框架的共享基本功能的单元：
+
+- 解耦的可重用块来处理文件、文本、JSON、压缩、加密、网络、RTTI，可能具有优化的 asm；
+- 其他更高级别的功能，如 ORM、SOA 或数据库访问都构建在这些块之上，并且位于父文件夹中；
+- 跨平台和交叉编译器：确保相同的代码可以在任何支持平台上的 FPC 和 Delphi 上编译，无论 RTL、操作系统或 CPU。
+
+## 单位介绍
+
+### mormot.core.base
+
+所有框架单元共享的基本类型和可重用的独立函数
+- 框架版本及信息
+- 用于编译器和CPU之间兼容性的常用类型
+- 数字（浮点数和整数）低级定义
+- 整数数组操作
+- `ObjArray` `PtrArray` `InterfaceArray` 包装函数
+- 映射二进制或位结构的低级类型
+- 缓冲区（例如散列和 SynLZ 压缩）原始函数
+- 日期/时间处理
+- 高效的“变体”值转换
+- 排序/比较功能
+- 一些方便的“TStream”后代和文件访问功能
+- RTL 标准函数的更快替代方案
+- 原始共享类型定义
+
+这些类型和函数的目标是跨平台和跨编译器，除了主要的 FPC/Delphi RTL 之外没有任何依赖。 它还检测其运行的 Intel/AMD 类型，以适应可用的最快的 asm 版本。 它是包含 x86_64 或 i386 asm 存根的主要单元。
+
+### mormot.core.os
+
+所有框架单元共享的跨平台功能
+- 一些跨系统类型和常量定义
+- 收集操作系统信息
+- 操作系统特定类型（例如`TWinRegistry`）
+- Unicode、时间、文件、控制台、库进程
+- 跨平台字符集和代码页支持
+- 每个类属性 O(1) 通过 `vmtAutoTable` 插槽查找（例如 RTTI 缓存）
+- `TSynLocker`/`TSynLocked` 和低级线程功能
+- Unix 守护进程和 Windows 服务支持
+
+该单元的目的是集中最常用的特定于操作系统的 API 调用，就像类固醇上的“SysUtils”单元一样，以避免“uses”子句中的“$ifdef/$endif”。
+
+实际上，一旦包含“mormot.core.os”，常规单元中就不需要“Windows”或“Linux/Unix”引用。 :)
+
+### mormot.core.os.mac
+
+MacOS API 调用 FPC，注入“mormot.core.os.pas”
+- 收集 MacOS 特定操作系统信息
+
+该单元使用 MacOSAll 并链接多个工具包，因此未包含在 `mormot.core.os.pas` 中以减少可执行文件大小，但在运行时注入此方法：只需在中包含“`uses mormot.core.os.mac`” 需要它的程序。
+
+### mormot.core.unicode
+
+所有框架单元共享的高效 Unicode 转换类
+- UTF-8高效编码/解码
+- UTF-8 / UTF-16 / Ansi 转换类
+- 支持 BOM/Unicode 的文本文件加载
+- 低级字符串转换函数
+- 文本区分大小写的转换和比较
+- UTF-8 字符串操作函数
+- `TRawUtf8DynArray` 处理函数
+- 独立于操作系统的 Unicode 进程
+
+### mormot.core.text
+
+所有框架单元共享的文本处理功能
+- 类似 CSV 的文本缓冲区迭代
+- 用于文本生成的“TTextWriter”父类
+- 数字（整数或浮点数）和变体到文本的转换
+- 文本格式化功能
+- 资源和时间函数
+- `ESynException` 类
+- 十六进制文本和二进制转换
+
+### mormot.core.datetime
+
+所有框架单元共享的日期和时间定义和流程
+- ISO-8601 兼容日期/时间文本编码
+- `TSynDate` / `TSynDateTime` / `TSynSystemTime` 高级对象
+- `TUnixTime` / `TUnixMSTime` POSIX Epoch 兼容 64 位日期/时间
+- `TTimeLog` 高效 64 位自定义日期/时间编码
+
+### mormot.core.rtti
+
+所有框架单元共享的交叉编译器 RTTI 定义
+- 低级交叉编译器 RTTI 定义
+- 枚举RTTI
+- 发布了“类”属性和方法 RTTI
+- `IInvokable` 接口 RTTI
+- 高效的动态数组和记录过程
+- 托管类型最终确定或复制
+- 用于 JSON 解析的 RTTI 值类型
+- 基于 RTTI 的自定义 JSON 解析注册
+- 高级 `TObjectWithID` 和 `TObjectWithCustomCreate` 类类型
+- 将最常用的 FPC RTL 函数重定向到优化的 x86_64 组件
+
+该单元的目的是避免直接使用 `TypInfo.pas` RTL 单元，该单元在编译器之间不完全兼容，并且缺乏无需内存分配的直接 RTTI 访问。 我们定义指向 RTTI 记录/对象的指针，以通过一组显式方法访问“TypeInfo()”。 这里，假记录/对象只是 Delphi/FPC RTL 的“TypInfo.pas”中定义的指针的包装器，具有内联的魔力。 我们将所有 RTTI 定义重新定义为“TRtti*”类型，以避免与“Ty”发布的类型名称混淆
