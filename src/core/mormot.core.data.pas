@@ -1,5 +1,4 @@
 
-
 /// Framework Core Low-Level Data Processing Functions
 // - this unit is a part of the Open Source Synopse mORMot framework 2,
 // licensed under a MPL/GPL/LGPL three license - see LICENSE.md
@@ -2561,6 +2560,10 @@ type
     // - both must be of the same exact type
     // - T*ObjArray will be reallocated and copied by content (using a temporary
     // JSON serialization), unless ObjArrayByRef is true and pointers are copied
+    /// 将一个动态数组的所有内容设置为当前数组
+     // - 两者必须具有完全相同的类型
+     // - T*ObjArray 将按内容重新分配和复制（使用临时
+     // JSON 序列化），除非 ObjArrayByRef 为 true 并且复制指针
     procedure CopyFrom(const Source; MaxItem: integer;
       ObjArrayByRef: boolean = false);
     /// set all content of the current dynamic array to another array variable
@@ -2569,6 +2572,10 @@ type
     // external Count integer variable is used by this instance
     // - T*ObjArray will be reallocated and copied by content (using a temporary
     // JSON serialization), unless ObjArrayByRef is true and pointers are copied
+    /// 将当前动态数组的所有内容设置到另一个数组变量
+     // - 两者必须具有完全相同的类型
+     // - 即使此实例使用外部 Count 整数变量，结果长度（Dest）也将匹配确切的项目计数
+     // - T*ObjArray 将按内容重新分配和复制（使用临时 JSON 序列化），除非 ObjArrayByRef 为 true 并且复制指针
     procedure CopyTo(out Dest; ObjArrayByRef: boolean = false);
     /// returns a pointer to an element of the array
     // - returns nil if aIndex is out of range
@@ -2576,77 +2583,119 @@ type
     // better use direct access to its wrapped variable, and not this (slightly)
     // slower and more error prone method (such pointer access lacks of strong
     // typing abilities), which is designed for TDynArray abstract/internal use
+    /// 返回指向数组元素的指针
+     // - 如果 aIndex 超出范围则返回 nil
+     // - 由于 TDynArray 只是现有数组的包装器，因此您应该更好地使用对其包装变量的直接访问，而不是这种（稍微）慢且更容易出错的方法（此类指针访问缺乏强类型能力），这是 专为 TDynArray 抽象/内部使用而设计
     function ItemPtr(index: PtrInt): pointer;
       {$ifdef HASINLINE}inline;{$endif}
     /// just a convenient wrapper of Info.Cache.ItemSize
+    /// 只是 Info.Cache.ItemSize 的方便包装
     function ItemSize: PtrUInt;
       {$ifdef HASINLINE}inline;{$endif}
     /// will copy one element content from its index into another variable
     // - do nothing and return false if index is out of range or Dest is nil
+    /// 将一个元素内容从其索引复制到另一个变量
+     // - 如果索引超出范围或 Dest 为 nil，则不执行任何操作并返回 false
     function ItemCopyAt(index: PtrInt; Dest: pointer): boolean;
       {$ifdef FPC}inline;{$endif}
     /// will move one element content from its index into another variable
     // - will erase the internal item after copy
     // - do nothing and return false if index is out of range or Dest is nil
+    /// 将一个元素内容从其索引移动到另一个变量
+     // - 复制后将擦除内部项目
+     // - 如果索引超出范围或 Dest 为 nil，则不执行任何操作并返回 false
     function ItemMoveTo(index: PtrInt; Dest: pointer): boolean;
     /// will copy one variable content into an indexed element
     // - do nothing if index is out of range
     // - ClearBeforeCopy will call ItemClear() before the copy, which may be safer
     // if the source item is a copy of Values[index] with some dynamic arrays
+    /// 将一个变量内容复制到索引元素中
+     // - 如果索引超出范围，则不执行任何操作
+     // - ClearBeforeCopy 将在复制之前调用 ItemClear()，如果源项是带有一些动态数组的 Values[index] 的副本，这可能会更安全
     procedure ItemCopyFrom(Source: pointer; index: PtrInt;
       ClearBeforeCopy: boolean = false);
       {$ifdef HASINLINE}inline;{$endif}
     /// compare the content of two items, returning TRUE if both values equal
     // - use the Compare() property function (if set) or using Info.Cache.ItemInfo
     // if available - and fallbacks to binary comparison
+    /// 比较两个项目的内容，如果两个值相等则返回 TRUE
+     // - 使用 Compare() 属性函数（如果设置）或使用 Info.Cache.ItemInfo （如果可用） - 并回退到二进制比较
     function ItemEquals(A, B: pointer; CaseInSensitive: boolean = false): boolean;
       {$ifdef HASINLINE}inline;{$endif}
     /// compare the content of two items, returning -1, 0 or +1s
     // - use the Compare() property function (if set) or using Info.Cache.ItemInfo
     // if available - and fallbacks to binary comparison
+    /// 比较两项的内容，返回-1、0或+1
+     // - 使用 Compare() 属性函数（如果设置）或使用 Info.Cache.ItemInfo （如果可用） - 并回退到二进制比较
     function ItemCompare(A, B: pointer; CaseInSensitive: boolean = false): integer;
     /// will reset the element content
     // - i.e. release any managed type memory, and fill Item with zeros
+    /// 将重置元素内容
+     // - 即释放任何托管类型内存，并用零填充 Item
     procedure ItemClear(Item: pointer);
       {$ifdef HASINLINE}inline;{$endif}
     /// will fill the element with some random content
     // - this method is thread-safe using Rtti.DoLock/DoUnLock
+    /// 将用一些随机内容填充元素
+     // - 该方法使用 Rtti.DoLock/DoUnLock 是线程安全的
     procedure ItemRandom(Item: pointer);
     /// will copy one element content
+    /// 将复制一个元素内容
     procedure ItemCopy(Source, Dest: pointer);
       {$ifdef HASINLINE}{$ifndef ISDELPHI2009}inline;{$endif}{$endif}
     /// will copy the first field value of an array element
     // - will use the array KnownType to guess the copy routine to use
     // - returns false if the type information is not enough for a safe copy
+    /// 将复制数组元素的第一个字段值
+     // - 将使用数组 KnownType 来猜测要使用的复制例程
+     // - 如果类型信息不足以进行安全复制，则返回 false
     function ItemCopyFirstField(Source, Dest: Pointer): boolean;
     /// save an array element into a serialized binary content
     // - use the same layout as TDynArray.SaveTo, but for a single item
     // - you can use ItemLoad method later to retrieve its content
     // - warning: Item must be of the same exact type than the dynamic array,
     // and must be a reference to a variable (you can't write ItemSave(i+10) e.g.)
+    /// 将数组元素保存为序列化的二进制内容
+     // - 使用与 TDynArray.SaveTo 相同的布局，但针对单个项目
+     // - 您可以稍后使用 ItemLoad 方法来检索其内容
+     // - 警告：项目必须与动态数组具有相同的类型，并且必须是对变量的引用（例如，您不能编写 ItemSave(i+10)）
     function ItemSave(Item: pointer): RawByteString;
     /// load an array element as saved by the ItemSave method into Item variable
     // - warning: Item must be of the same exact type than the dynamic array
+    /// 将 ItemSave 方法保存的数组元素加载到 Item 变量中
+     // - 警告：项目的类型必须与动态数组的类型完全相同
     procedure ItemLoad(Source, SourceMax: PAnsiChar; Item: pointer);
     /// load an array element as saved by the ItemSave method
     // - this overloaded method will retrieve the element as a memory buffer,
     // which should be cleared by ItemLoadMemClear() before release
+    /// 加载由 ItemSave 方法保存的数组元素
+     // - 此重载方法将检索元素作为内存缓冲区，在释放之前应通过 ItemLoadMemClear() 清除该元素
     function ItemLoadMem(Source, SourceMax: PAnsiChar): RawByteString;
     /// search for an array element as saved by the ItemSave method
     // - same as ItemLoad() + Find()/IndexOf() + ItemLoadClear()
     // - will call Find() method if Compare property is set
     // - will call generic IndexOf() method if no Compare property is set
+    /// 搜索由 ItemSave 方法保存的数组元素
+     // - 与 ItemLoad() + Find()/IndexOf() + ItemLoadClear() 相同
+     // - 如果设置了 Compare 属性，将调用 Find() 方法
+     // - 如果没有设置 Compare 属性，将调用通用 IndexOf() 方法
     function ItemLoadFind(Source, SourceMax: PAnsiChar): integer;
     /// finalize a temporary buffer used to store an element via ItemLoadMem()
     // - will release any managed type referenced inside the RawByteString,
     // then void the variable
     // - is just a wrapper around ItemClear(pointer(ItemTemp)) + ItemTemp := ''
+    /// 通过 ItemLoadMem() 完成用于存储元素的临时缓冲区
+     // - 将释放 RawByteString 内引用的任何托管类型，然后使该变量无效
+     // - 只是 ItemClear(pointer(ItemTemp)) + ItemTemp := '' 的包装
     procedure ItemLoadMemClear(var ItemTemp: RawByteString);
 
     /// retrieve or set the number of items of the dynamic array
     // - same as length(DynArray) or SetLength(DynArray)
     // - this property will recognize T*ObjArray types, so will free any stored
     // instance if the array is sized down
+    /// 检索或设置动态数组的项目数
+     // - 与 length(DynArray) 或 SetLength(DynArray) 相同
+     // - 此属性将识别 T*ObjArray 类型，因此如果数组缩小，将释放任何存储的实例
     property Count: PtrInt
       read GetCount write SetCount;
     /// the internal buffer capacity
@@ -2657,6 +2706,11 @@ type
     // will affect the Count value, i.e. Add() will append after this count
     // - this property will recognize T*ObjArray types, so will free any stored
     // instance if the array is sized down
+    /// 内部缓冲区容量
+     // - 如果没有使用 Init 设置外部 Count 指针，则与 Count 相同
+     // - 如果设置了外部 Count 指针，则可以在大量使用 Add() 方法之前为此属性设置一个值，例如
+     // - 如果没有设置外部 Count 指针，则为此属性设置值将影响 Count 值，即 Add() 将追加到此计数之后
+     // - 此属性将识别 T*ObjArray 类型，因此如果数组缩小，将释放任何存储的实例
     property Capacity: PtrInt
       read GetCapacity write SetCapacity;
     /// the compare function to be used for Sort and Find methods
@@ -2666,6 +2720,13 @@ type
     // SortDynArrayInt64, SortDynArrayDouble, SortDynArrayAnsiString,
     // SortDynArrayAnsiStringI, SortDynArrayString, SortDynArrayStringI,
     // SortDynArrayUnicodeString, SortDynArrayUnicodeStringI
+    /// 用于排序和查找方法的比较函数
+     // - 默认情况下，不设置比较函数
+     // - 基本类型存在通用函数：例如 SortDynArrayByte、SortDynArrayBoolean、
+     // SortDynArrayWord、SortDynArrayInteger、SortDynArrayCardinal、SortDynArraySingle、
+     // SortDynArrayInt64, SortDynArrayDouble, SortDynArrayAnsiString,
+     // SortDynArrayAnsiStringI, SortDynArrayString, SortDynArrayStringI,
+     // SortDynArrayUnicodeString, SortDynArrayUnicodeStringI
     property Compare: TDynArraySortCompare
       read fCompare write SetCompare;
     /// must be TRUE if the array is currently in sorted order according to
@@ -2675,55 +2736,76 @@ type
     // - you MUST set this property to false if you modify the dynamic array
     // content in your code, so that Find() won't try to wrongly use binary
     // search in an unsorted array, and miss its purpose
+    /// 如果数组当前按照比较函数排序，则必须为 TRUE
+     // - Add/Delete/Insert/Load* 方法会将此属性重置为 false
+     // - Sort 方法会将此属性设置为 true
+     // - 如果您修改代码中的动态数组内容，则必须将此属性设置为 false，以便 Find() 不会尝试在未排序的数组中错误地使用二分搜索，而错过其目的
     property Sorted: boolean
       read fSorted write fSorted;
     /// can be set to TRUE to avoid any item finalization
     // -  e.g. with T*ObjArray - handle with care to avoid memory leaks
+    /// 可以设置为 TRUE 以避免任何项目最终确定
+     // - 例如 使用 T*ObjArray - 小心处理以避免内存泄漏
     property NoFinalize: boolean
       read fNoFinalize write fNoFinalize;
 
     /// low-level direct access to the storage variable
+    /// 低级直接访问存储变量
     property Value: PPointer
       read fValue;
     /// low-level extended RTTI access
     // - use e.g. Info.ArrayRtti to access the item RTTI, or Info.Cache.ItemInfo
     // to get the managed item TypeInfo()
+    /// 低级扩展RTTI访问
+     // - 使用例如 Info.ArrayRtti 访问项目 RTTI，或 Info.Cache.ItemInfo
+     // 获取管理项 TypeInfo()
     property Info: TRttiCustom
       read fInfo;
     /// low-level direct access to the external count (if defined at Init)
+    /// 低级直接访问外部计数（如果在 Init 中定义）
     property CountExternal: PInteger
       read fCountP;
   end;
 
   /// just a wrapper record to join a TDynArray, its Count and a TRWLightLock
+  /// 只是一个包装记录，用于连接 TDynArray、其计数和 TRWLightLock
   TDynArrayLocked = record
     /// lightweight multiple Reads / exclusive Write non-upgradable lock
+    /// 轻量级多读/独占写不可升级锁
     Safe: TRWLightLock;
     /// the wrapper to a dynamic array
+    /// 动态数组的包装
     DynArray: TDynArray;
     /// will store the length of the TDynArray
+    /// 将存储 TDynArray 的长度
     Count: integer;
   end;
 
 
-{.$define DYNARRAYHASHCOLLISIONCOUNT} // to be defined also in test.core.base
+{.$define DYNARRAYHASHCOLLISIONCOUNT} // to be defined also in test.core.base （也在 test.core.base 中定义）
 
-{$ifndef CPU32DELPHI} // Delphi Win32 compiler doesn't like Lemire algorithm
+{$ifndef CPU32DELPHI} // Delphi Win32 compiler doesn't like Lemire algorithm （Delphi Win32 编译器不喜欢 Lemire 算法）
 
   {$define DYNARRAYHASH_LEMIRE}
   // use the Lemire 64-bit multiplication for faster hash reduction
   // see https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction
   // - generate more collisions with crc32c, but is always faster -> enabled
-
+  // 使用 Lemire 64 位乘法来更快地减少哈希值。 请参阅https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction
+   // - 与 crc32c 产生更多冲突，但总是更快 -> 启用
 {$endif CPU32DELPHI}
 
 // use Power-Of-Two sizes for smallest HashTables[], to reduce the hash with AND
 // - and Delphi Win32 is not efficient at 64-bit multiplication, anyway
+// 对最小的 HashTables[] 使用二次幂大小，通过 AND 减少哈希值
+// - 无论如何，Delphi Win32 在 64 位乘法方面效率不高
 {$define DYNARRAYHASH_PO2}
 
 // use 16-bit Hash table when indexes fit in a word (array Capacity < 65535)
 // - to reduce memory consumption and slightly enhance CPU cache efficiency
 // - e.g. arrays of size 1..127 use only 256*2=512 bytes for their hash table
+// 当索引适合一个字时使用 16 位哈希表（数组容量 < 65535）
+// - 减少内存消耗并略微提高CPU缓存效率
+// - 例如 大小为 1..127 的数组仅使用 256*2=512 字节作为其哈希表
 {$define DYNARRAYHASH_16BIT}
 
 {$ifdef DYNARRAYHASH_PO2}
@@ -2736,6 +2818,10 @@ const
   // - 64-bit CPU and FPC can efficiently compute a prime reduction using Lemire
   // algorithm, but power of two sizes still have a better practical performance
   // for lower (and most common) content until it consumes too much memory
+  /// 为 TDynArrayHasher.HashTableIndex 中的内联按位除法定义
+   // - HashTableSize<=HASH_PO2 预计为 2 的幂（快速二元运算）； 限制设置为 262,144 个哈希表槽 (=1MB)，容量 = 131,072 个项目
+   // - 高于此限制，使用一组递增素数； 使用素数作为哈希表模可以增强其分布，特别是对于弱哈希函数
+   // - 64位CPU和FPC可以使用Lemire算法有效地计算素数约简，但是对于较低（也是最常见）的内容，两种大小的幂仍然具有更好的实际性能，直到它消耗太多内存
   HASH_PO2 = 1 shl 18;
 {$endif DYNARRAYHASH_PO2}
 
@@ -2744,6 +2830,8 @@ const
 type
   /// function prototype to be used for hashing of a dynamic array element
   // - this function must use the supplied hasher on the Item data
+  /// 用于动态数组元素散列的函数原型
+   // - 此函数必须在项目数据上使用提供的哈希器
   TDynArrayHashOne = function(const Item; Hasher: THasher): cardinal;
 
   /// event handler to be used for hashing of a dynamic array element
@@ -12267,8 +12355,3 @@ initialization
   InitializeUnit;
 
 end.
-
-
-
-
-
