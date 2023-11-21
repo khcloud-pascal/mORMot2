@@ -1,4 +1,5 @@
 
+
 /// Framework Core Low-Level Data Processing Functions
 // - this unit is a part of the Open Source Synopse mORMot framework 2,
 // licensed under a MPL/GPL/LGPL three license - see LICENSE.md
@@ -2836,6 +2837,8 @@ type
 
   /// event handler to be used for hashing of a dynamic array element
   // - can be set as an alternative to TDynArrayHashOne
+  /// 用于动态数组元素散列的事件处理程序
+   // - 可以设置为 TDynArrayHashOne 的替代方案
   TOnDynArrayHashOne = function(const Item): cardinal of object;
 
   TDynArrayHasherState = set of (
@@ -2847,6 +2850,9 @@ type
   // maintain a hash table over an existing dynamic array: several TDynArrayHasher
   // could be applied to a single TDynArray wrapper
   // - TDynArrayHashed will use a TDynArrayHasher on its own storage
+  /// 对任何动态数组内容实现 O(1) 查找
+   // - 这不会处理存储过程（如添加/更新），只是在现有动态数组上有效维护哈希表：多个 TDynArrayHasher 可以应用于单个 TDynArray 包装器
+   // - TDynArrayHashed 将在其自己的存储上使用 TDynArrayHasher
   {$ifdef USERECORDWITHMETHODS}
   TDynArrayHasher = record
   {$else}
@@ -2875,74 +2881,104 @@ type
   public
     {$ifdef DYNARRAYHASHCOLLISIONCOUNT}
     /// low-level access to an hash collisions counter for all instance live
+    /// 对所有实例的哈希冲突计数器进行低级访问
     CountCollisions: cardinal;
     /// low-level access to an hash collisions counter for the last HashTable[]
+    /// 对最后一个 HashTable[] 的哈希冲突计数器的低级访问
     CountCollisionsCurrent: cardinal;
     /// low-level access to the size of the internal HashTable[]
+    /// 低级访问内部HashTable[]的大小
     HashTableSize: integer;
     {$endif DYNARRAYHASHCOLLISIONCOUNT}
     /// initialize the hash table for a given dynamic array storage
     // - you can call this method several times, e.g. if aCaseInsensitive changed
+    /// 初始化给定动态数组存储的哈希表
+     // - 您可以多次调用此方法，例如 如果 aCaseInsensitive 改变
     procedure Init(aDynArray: PDynArray; aHashItem: TDynArrayHashOne;
       const aEventHash: TOnDynArrayHashOne; aHasher: THasher; aCompare: TDynArraySortCompare;
       const aEventCompare: TOnDynArraySortCompare; aCaseInsensitive: boolean);
     /// initialize a known hash table for a given dynamic array storage
     // - you can call this method several times, e.g. if aCaseInsensitive changed
+    /// 为给定的动态数组存储初始化已知的哈希表
+     // - 您可以多次调用此方法，例如 如果 aCaseInsensitive 改变
     procedure InitSpecific(aDynArray: PDynArray; aKind: TRttiParserType;
       aCaseInsensitive: boolean; aHasher: THasher);
     /// search for an element value inside the dynamic array without hashing
+    /// 在动态数组中搜索元素值而不进行散列
     function Scan(Item: pointer): PtrInt;
     /// search for an element value inside the dynamic array with hashing
+    /// 使用哈希在动态数组中搜索元素值
     function Find(Item: pointer): PtrInt; overload;
     /// search for a hashed element value inside the dynamic array with hashing
+    /// 使用散列在动态数组中搜索散列元素值
     function Find(Item: pointer; aHashCode: cardinal): PtrInt; overload;
     /// search for a hash position inside the dynamic array with hashing
+    /// 通过哈希在动态数组中搜索哈希位置
     function Find(aHashCode: cardinal; aForAdd: boolean): PtrInt; overload;
     /// returns position in array, or next void index in HashTable[] as -(index+1)
+    /// 返回数组中的位置，或 HashTable[] 中的下一个空索引作为 -(index+1)
     function FindOrNew(aHashCode: cardinal; Item: pointer; aHashTableIndex: PPtrInt): PtrInt;
     /// returns position in array, or -1 if not found with a custom comparer
+    /// 返回数组中的位置，如果使用自定义比较器未找到则返回 -1
     function FindOrNewComp(aHashCode: cardinal; Item: pointer;
       Comp: TDynArraySortCompare = nil): PtrInt;
     /// search an hashed element value for adding, updating the internal hash table
     // - trigger hashing if Count reaches CountTrigger
+    /// 搜索哈希元素值以添加、更新内部哈希表
+     // - 如果 Count 达到 CountTrigger，则触发哈希
     function FindBeforeAdd(Item: pointer; out wasAdded: boolean;
       aHashCode: cardinal): PtrInt;
     /// search and delete an element value, updating the internal hash table
+    /// 搜索并删除一个元素值，更新内部哈希表
     function FindBeforeDelete(Item: pointer): PtrInt;
     /// full computation of the internal hash table
     // - to be called after items have been manually updated - e.g. after Clear
     // - can return the number of duplicated values found (likely to be 0)
+    /// 内部哈希表的完整计算
+     // - 在手动更新项目后调用 - 例如 清除后
+     // - 可以返回找到的重复值的数量（可能为 0）
     procedure ForceReHash(duplicates: PInteger = nil);
     {$ifndef PUREMORMOT2}
     function ReHash(forced: boolean = false): integer;
     {$endif PUREMORMOT2}
     /// compute the hash of a given item
+    /// 计算给定项的哈希值
     function HashOne(Item: pointer): cardinal;
       {$ifdef FPC_OR_DELPHIXE4}inline;{$endif}
       { not inlined to circumvent Delphi 2007=C1632, 2010=C1872, XE3=C2130 }
     /// compare one given item from its index with a value
     // - using either EventCompare() or Compare() functions
+    /// 将索引中的一个给定项目与一个值进行比较
+     // - 使用 EventCompare() 或 Compare() 函数
     function Equals(Item: pointer; ndx: PtrInt): boolean;
        {$ifdef FPC_OR_DELPHIXE4}inline;{$endif}
     /// retrieve the low-level hash of a given item
+    /// 检索给定项目的低级哈希
     function GetHashFromIndex(aIndex: PtrInt): cardinal;
     /// associated item comparison - may differ from DynArray^.Compare
+    /// 关联项比较 - 可能与 DynArray^.Compare 不同
     property Compare: TDynArraySortCompare
       read fCompare;
     /// custom method-based comparison function
     // - should be set just after Init, when no item has been stored
+    /// 自定义基于方法的比较函数
+     // - 应该在 Init 之后设置，当没有存储任何项目时
     property EventCompare: TOnDynArraySortCompare
       read fEventCompare write SetEventCompare;
     /// custom method-based hashing function
     // - should be set just after Init, when no item has been stored
+    /// 自定义基于方法的哈希函数
+     // - 应该在 Init 之后设置，当没有存储任何项目时
     property EventHash: TOnDynArrayHashOne
       read fEventHash write SetEventHash;
     /// associated item hasher
+    /// 关联项哈希器
     property Hasher: THasher
       read fHasher;
   end;
 
   /// pointer to a TDynArrayHasher instance
+  /// 指向 TDynArrayHasher 实例的指针
   PDynArrayHasher = ^TDynArrayHasher;
 
 type
@@ -2960,9 +2996,16 @@ type
   // will avoid most re-hashing for FindHashedForAdding+FindHashedAndUpdate)
   // - consider using TSynDictionary from mormot.core.json for a thread-safe
   // stand-alone storage of key/value pairs
+  /// 用于使用快速哈希访问任何动态数组项
+   // - 默认情况下，二进制排序可用于搜索 TDynArray 的项目：在大型数组上使用哈希来实现字典的速度更快
+   // - 在当前的实现中，尚未处理元素的修改（更新或删除）：您应该重新哈希所有内容 - 只有 TDynArrayHashed.FindHashedForAdding / FindHashedAndUpdate / FindHashedAndDelete 才会刷新内部哈希
+   // - 该对象扩展了 TDynArray 类型，因为如果使用 TDynArrayHashed 而不是 TDynArray，则 Hashs[] 动态数组的存在会增加代码大小
+   // - 为了获得更好的性能，您应该使用外部Count变量，并将Capacity属性设置为预期的最大计数（这将避免FindHashedForAdding+FindHashedAndUpdate的大多数重新散列）
+   // - 考虑使用 mormot.core.json 中的 TSynDictionary 来进行键/值对的线程安全独立存储
   {$ifdef UNDIRECTDYNARRAY}
   TDynArrayHashed = record
   // pseudo inheritance for most used methods
+  // 最常用方法的伪继承
   private
     function GetCount: PtrInt; inline;
     procedure SetCount(aCount: PtrInt); inline;
@@ -3018,10 +3061,17 @@ type
     // SSE4.2 instruction if available
     // - if CaseInsensitive is set to TRUE, it will ignore difference in 7-bit
     // alphabetic characters (e.g. compare 'a' and 'A' as equal)
+    /// 使用一维动态数组初始化包装器
+     // - 此版本接受一些哈希专用参数：aHashItem 设置如何哈希每个元素，aCompare 处理哈希冲突
+     // - 如果没有提供 aHashItem，它将根据 RTTI（即字符串或二进制类型）以及记录的第一个字段（包括字符串）进行哈希处理
+     // - 如果没有提供 aCompare，它将使用默认的 Equals() 方法
+     // - 如果没有提供 THasher 函数，它将使用 DefaultHasher 全局变量中提供的函数，默认设置为 crc32c() - 使用 SSE4.2 指令（如果可用）
+     // - 如果 CaseInsensitive 设置为 TRUE，它将忽略 7 位字母字符的差异（例如，比较 'a' 和 'A' 相等）
     procedure Init(aTypeInfo: PRttiInfo; var aValue; aHashItem: TDynArrayHashOne = nil;
       aCompare: TDynArraySortCompare = nil; aHasher: THasher = nil;
       aCountPointer: PInteger = nil; aCaseInsensitive: boolean = false);
     /// initialize the wrapper with a one-dimension dynamic array from our RTTI
+    /// 使用 RTTI 中的一维动态数组初始化包装器
     procedure InitRtti(aRtti: TRttiCustom; var aValue; aHashItem: TDynArrayHashOne = nil;
       aCompare: TDynArraySortCompare = nil; aHasher: THasher = nil;
       aCountPointer: PInteger = nil; aCaseInsensitive: boolean = false);
@@ -3032,6 +3082,11 @@ type
     // - no RTTI check is made over the corresponding array layout: you shall
     // ensure that aKind matches the dynamic array element definition
     // - aCaseInsensitive will be used for djRawUtf8..djHash512 text comparison
+    /// 使用一维动态数组初始化包装器
+     // - 此版本接受指定如何进行散列和比较，设置第一个/散列字段的 TRttiParserType 类型
+     // - djNone 和 djCustom 太模糊，会引发异常
+     // - 不对相应的数组布局进行 RTTI 检查：您应确保 aKind 与动态数组元素定义匹配
+     // - aCaseInsensitive 将用于 djRawUtf8..djHash512 文本比较
     procedure InitSpecific(aTypeInfo: PRttiInfo; var aValue; aKind: TRttiParserType;
       aCountPointer: PInteger = nil; aCaseInsensitive: boolean = false;
       aHasher: THasher = nil);
@@ -3041,6 +3096,9 @@ type
     // or after calling LoadFrom/Clear method) - this is not necessary after
     // FindHashedForAdding / FindHashedAndUpdate / FindHashedAndDelete methods
     // - returns the number of duplicated items found - which should be 0
+    /// 将重新计算动态数组当前项的所有哈希值
+     // - 当对动态数组内容进行修改时（例如，在元素删除或更新的情况下，或者在调用 LoadFrom/Clear 方法之后），可以有意调用 - 在 FindHashedForAdding / FindHashedAndUpdate / FindHashedAndDelete 方法之后不需要这样做
+     // - 返回找到的重复项的数量 - 应该为 0
     procedure ForceReHash;
       {$ifdef HASINLINE} inline; {$endif}
     {$ifndef PUREMORMOT2}
@@ -3053,18 +3111,29 @@ type
     // - Item must refer to a variable: e.g. you can't write FindHashed(i+10)
     // - will call fHashItem(Item,fHasher) to compute the needed hash
     // - returns -1 if not found, or the index in the dynamic array if found
+    /// 使用散列在动态数组中搜索元素值
+     // - Item 应该是哈希函数和 Equals/Compare 方法所期望的类型：例如 如果记录中的搜索/散列字段是字符串作为第一个字段，则可以安全地使用字符串变量作为项目
+     // - 项目必须引用一个变量：例如 你不能写 FindHashed(i+10)
+     // - 将调用 fHashItem(Item,fHasher) 来计算所需的哈希值
+     // - 如果未找到则返回 -1，如果找到则返回动态数组中的索引
     function FindHashed(const Item): PtrInt;
       {$ifdef FPC} inline; {$endif}
     /// search for an element value inside the dynamic array using its hash
     // - returns -1 if not found, or the index in the dynamic array if found
     // - aHashCode parameter constains an already hashed value of the item,
     // to be used e.g. after a call to HashFind()
+    /// 使用哈希值在动态数组中搜索元素值
+     // - 如果未找到则返回 -1，如果找到则返回动态数组中的索引
+     // - aHashCode 参数包含该项目的已散列值，例如要使用的 调用 HashFind() 后
     function FindFromHash(const Item; aHashCode: cardinal): PtrInt;
     /// search for an element value inside the dynamic array using hashing, and
     // fill ItemToFill with the found content
     // - return the index found (0..Count-1), or -1 if Item was not found
     // - ItemToFill should be of the type expected by the dynamic array, since
     // all its fields will be set on match
+    /// 使用散列在动态数组中搜索元素值，并用找到的内容填充 ItemToFill
+     // - 返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - ItemToFill 应该是动态数组所期望的类型，因为它的所有字段都将在匹配时设置
     function FindHashedAndFill(var ItemToFill): PtrInt;
     /// search for an element value inside the dynamic array using hashing, and
     // add a void entry to the array if was not found (unless noAddEntry is set)
@@ -3081,12 +3150,21 @@ type
     // content to expecting value - in short, Item is used only for searching,
     // not copied to the newly created entry in the array  - check
     // FindHashedAndUpdate() for a method actually copying Item fields
+    /// 使用散列在动态数组中搜索元素值，如果未找到，则向数组添加一个 void 条目（除非设置了 noAddEntry）
+     // - 此方法将使用散列来快速检索
+     // - Item 应该是哈希函数和 Equals/Compare 方法所期望的类型：例如 如果记录中的搜索/散列字段是字符串作为第一个字段，则可以安全地使用字符串变量作为项目
+     // - 返回动态数组中的索引（如果找到）（并将 wasAdded 设置为 false），或者动态数组中新创建的索引（并将 wasAdded 设置为 true）
+     // - 为了更快的处理（避免重新散列），请设置Capacity属性
+     // - 警告：与 Add() 方法相反，如果将条目添加到数组中 (wasAdded=true)，则该条目将保留为 VOID：您必须将字段内容设置为期望值 - 简而言之，
+     // 使用 Item 仅用于搜索，不复制到数组中新创建的条目 - 检查 FindHashedAndUpdate() 以获取实际复制 Item 字段的方法
     function FindHashedForAdding(const Item; out wasAdded: boolean;
       noAddEntry: boolean = false): PtrInt; overload;
     /// search for an element value inside the dynamic array using hashing, and
     // add a void entry to the array if was not found (unless noAddEntry is set)
     // - overloaded method accepting an already hashed value of the item, to be
     // used e.g. after a call to HashFind()
+    /// 使用散列在动态数组中搜索元素值，如果未找到，则向数组添加一个 void 条目（除非设置了 noAddEntry）
+     // - 重载方法接受已散列的项目值，例如使用 调用 HashFind() 后
     function FindHashedForAdding(const Item; out wasAdded: boolean;
       aHashCode: cardinal; noAddEntry: boolean = false): PtrInt; overload;
     /// ensure a given element name is unique, then add it to the array
@@ -3096,11 +3174,19 @@ type
     // - use internally FindHashedForAdding method
     // - this version will set the field content with the unique value
     // - returns a pointer to the newly added element (to set other fields)
+    /// 确保给定的元素名称是唯一的，然后将其添加到数组中
+     // - 预期的元素布局在第一个位置有一个 RawUtf8 字段
+     // - aName 被搜索（使用散列）是否唯一，如果不是，则使用提供的参数引发 ESynException.CreateUtf8()
+     // - 在内部使用 FindHashedForAdding 方法
+     // - 此版本将使用唯一值设置字段内容
+     // - 返回指向新添加元素的指针（以设置其他字段）
     function AddUniqueName(const aName: RawUtf8; const ExceptionMsg: RawUtf8;
       const ExceptionArgs: array of const;
       aNewIndex: PPtrInt = nil): pointer; overload;
     /// ensure a given element name is unique, then add it to the array
     // - just a wrapper to AddUniqueName(aName,'',[],aNewIndex)
+    /// 确保给定的元素名称是唯一的，然后将其添加到数组中
+     // - 只是 AddUniqueName(aName,'',[],aNewIndex) 的包装
     function AddUniqueName(const aName: RawUtf8;
       aNewIndex: PPtrInt = nil): pointer; overload;
     /// search for a given element name, make it unique, and add it to the array
@@ -3110,6 +3196,12 @@ type
     // - use internally FindHashedForAdding method
     // - this version will set the field content with the unique value
     // - returns a pointer to the newly added element (to set other fields)
+    /// 搜索给定的元素名称，使其唯一，并将其添加到数组中
+     // - 预期的元素布局在第一个位置有一个 RawUtf8 字段
+     // - aName 被搜索（使用哈希）是否唯一，如果不是，则添加一些后缀以使其唯一，从 _1 到 _999 计数
+     // - 在内部使用 FindHashedForAdding 方法
+     // - 此版本将使用唯一值设置字段内容
+     // - 返回指向新添加元素的指针（以设置其他字段）
     function AddAndMakeUniqueName(aName: RawUtf8): pointer;
     /// search for an element value inside the dynamic array using hashing, then
     // update any matching item, or add the item if none matched
@@ -3126,6 +3218,11 @@ type
     // - Item should be of the type expected by the dynamic array, since its
     // content will be copied into the dynamic array, and it must refer to a
     // variable: e.g. you can't write FindHashedAndUpdate(i+10)
+    /// 使用散列在动态数组中搜索元素值，然后更新任何匹配的项目，如果没有匹配的则添加该项目
+     // - 按照设计，散列字段不应被此更新修改，否则该方法将无法找到并更新旧散列：在这种情况下，您应该首先调用 FindHashedAndDelete(OldItem)，然后调用 FindHashedForAdding(NewItem) ) 正确处理内部哈希表
+     // - 如果 AddIfNotExisting 为 FALSE，则返回找到的索引 (0..Count-1)，如果未找到 Item，则返回 -1 - 更新将强制缓慢重新散列所有内容
+     // - 如果 AddIfNotExisting 为 TRUE，则返回找到的索引 (0..Count-1)，或者新创建/添加的索引是 Item 值不匹配 - 添加不会重新散列所有内容 - 为了更快的处理（避免 rehash），请设置Capacity属性
+     // - Item 应该是动态数组所期望的类型，因为它的内容将被复制到动态数组中，并且它必须引用一个变量：例如 你不能写
     function FindHashedAndUpdate(const Item; AddIfNotExisting: boolean): PtrInt;
     /// search for an element value inside the dynamic array using hashing, and
     // delete it if matchs
@@ -3135,6 +3232,11 @@ type
     // Equals/Compare methods, and must refer to a variable: e.g. you can't
     // write FindHashedAndDelete(i+10)
     // - it won't call slow ForceReHash but refresh the hash table as needed
+    /// 使用哈希在动态数组中搜索元素值，如果匹配则将其删除
+     // - 返回已删除的索引 (0..Count-1)，如果未找到 Item，则返回 -1
+     // - 可以选择在擦除之前将已删除的项目复制到 FillDeleted^
+     // - Item 应该是哈希函数和 Equals/Compare 方法所期望的类型，并且必须引用变量：例如 你不能写 FindHashedAndDelete(i+10)
+     // - 它不会调用缓慢的ForceReHash，而是根据需要刷新哈希表
     function FindHashedAndDelete(const Item; FillDeleted: pointer = nil;
       noDeleteEntry: boolean = false): PtrInt;
     /// search for an element value inside the dynamic array without hashing
@@ -3143,16 +3245,25 @@ type
     // Equals/Compare methods, and must refer to a variable: e.g. you can't
     // write Scan(i+10)
     // - returns -1 if not found, or the index in the dynamic array if found
+    /// 在动态数组中搜索元素值而不进行散列
+     // - 优于 Find()，因为如果定义的话将使用 EventCompare
+     // - Item 应该是哈希函数和 Equals/Compare 方法所期望的类型，并且必须引用变量：例如 你不能写 Scan(i+10)
+     // - 如果未找到则返回 -1，如果找到则返回动态数组中的索引
     function Scan(const Item): PtrInt;
     /// retrieve the hash value of a given item, from its index
+    /// 从给定项目的索引中检索其哈希值
     property Hash[aIndex: PtrInt]: cardinal
       read GetHashFromIndex;
     /// alternative event-oriented Compare function to be used for Sort and Find
     // - will be used instead of Compare, to allow object-oriented callbacks
     // - should be set just after Init, when not item has been stored
+    /// 用于排序和查找的替代面向事件的比较函数
+     // - 将用来代替 Compare，以允许面向对象的回调
+     // - 应该在 Init 之后设置，当没有存储项目时
     property EventCompare: TOnDynArraySortCompare
       read fHash.fEventCompare write SetEventCompare;
     /// custom hash function used for hashing of a dynamic array element
+    /// 用于动态数组元素散列的自定义散列函数
     property HashItem: TDynArrayHashOne
       read fHash.fHashItem;
     /// alternative event-oriented Hash function
@@ -3160,10 +3271,15 @@ type
     // on each dynamic array entries - HashItem will still be used on
     // const Item values, since they may be just a sub part of the stored entry
     // - should be set just after Init, when not item has been stored
+    /// 替代的面向事件的哈希函数
+     // - 在每个动态数组条目上将使用此面向对象的回调而不是 HashItem() - HashItem 仍将在 const Item 值上使用，因为它们可能只是存储条目的子部分
+     // - 应该在 Init 之后设置，当没有存储项目时
     property EventHash: TOnDynArrayHashOne
       read fHash.fEventHash write SetEventHash;
     /// access to the internal hash table
     // - you can call e.g. Hasher.Clear to invalidate the whole hash table
+    /// 访问内部哈希表
+     // - 你可以调用例如 Hasher.Clear 使整个哈希表无效
     property Hasher: TDynArrayHasher
       read fHash;
   end;
@@ -3190,12 +3306,29 @@ type
 // !  end;
 // ! (...)
 // ! bin := DynArray(TypeInfo(TIntegerDynArray), IntArray).SaveTo;
+/// 用一维动态数组初始化结构体
+// - 动态数组必须使用其自己的类型进行定义（例如 TIntegerDynArray = 整数数组）
+// - 如果设置了aCountPointer，将使用它将代替length()来存储动态数组项计数 - 将元素添加到数组时会快得多，
+// 因为动态数组不需要每次都调整大小 - 但在这种情况下，访问数据时应该使用 Count 属性而不是 length(array) 或 high(array)：事实上 length(array) 将存储保留的内存大小，而不是项目计数
+// - 如果设置了 aCountPointer，则无论数组长度是多少，其内容都将设置为 0，或者当前的 aCountPointer^ 值是
+// - 典型用法可能是：
+// !var
+// !  IntArray: TIntegerDynArray;
+// !begin
+// !  with DynArray(TypeInfo(TIntegerDynArray), IntArray) do
+// !  begin
+// !    (...)
+// !  end;
+// ! (...)
+// ! bin := DynArray(TypeInfo(TIntegerDynArray), IntArray).SaveTo;
 function DynArray(aTypeInfo: PRttiInfo; var aValue;
   aCountPointer: PInteger = nil): TDynArray;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// get the hash function corresponding to a given standard array type
 // - as used e.g. internally by TDynArrayHasher.Init
+/// 获取给定标准数组类型对应的哈希函数
+// - 如所使用的，例如 内部由 TDynArrayHasher.Init
 function DynArrayHashOne(Kind: TRttiParserType;
   CaseInsensitive: boolean = false): TDynArrayHashOne;
 
@@ -3203,107 +3336,145 @@ function DynArrayHashOne(Kind: TRttiParserType;
 // - this function will use the supplied TSynTempBuffer for index storage,
 // so use PIntegerArray(Indexes.buf) to access the values
 // - caller should always make Indexes.Done once finshed
+/// 通过外部索引数组对任何动态数组进行排序
+// - 该函数将使用提供的 TSynTempBuffer 进行索引存储，因此使用 PIntegerArray(Indexes.buf) 来访问值
+// - 调用者应始终在完成后执行 Indexes.Done
 procedure DynArraySortIndexed(Values: pointer; ItemSize, Count: integer;
   out Indexes: TSynTempBuffer; Compare: TDynArraySortCompare);
 
 /// get the comparison function corresponding to a given standard array type
 // - as used e.g. internally by TDynArray
+/// 获取给定标准数组类型对应的比较函数
+// - 如所使用的，例如 内部通过 TDynArray
 function DynArraySortOne(Kind: TRttiParserType; CaseInsensitive: boolean): TDynArraySortCompare;
 
 /// sort any TObjArray with a given comparison function
+/// 使用给定的比较函数对任何 TObjArray 进行排序
 procedure ObjArraySort(var aValue; Compare: TDynArraySortCompare;
   CountPointer: PInteger = nil);
 
 
 { *************** Integer Arrays Extended Process }
+{ ************** 整数数组扩展过程 }
 
 type
   /// event handler called by NotifySortedIntegerChanges()
   // - Sender is an opaque const value, maybe a TObject or any pointer
+  /// 由 NotifySortedIntegerChanges() 调用的事件处理程序
+   // - Sender 是一个不透明的 const 值，可能是 TObject 或任何指针
   TOnNotifySortedIntegerChange = procedure(const Sender; Value: integer) of object;
 
 /// compares two 32-bit signed sorted integer arrays, and call event handlers
 // to notify the corresponding modifications in an O(n) time
 // - items in both old[] and new[] arrays are required to be sorted
+/// 比较两个32位有符号排序整数数组，并调用事件处理程序在O(n)时间内通知相应的修改
+// - old[] 和 new[] 数组中的项目都需要排序
 procedure NotifySortedIntegerChanges(old, new: PIntegerArray; oldn, newn: PtrInt;
   const added, deleted: TOnNotifySortedIntegerChange; const sender);
 
 /// copy an integer array, then sort it, low values first
+/// 复制一个整数数组，然后对其进行排序，低值优先
 procedure CopyAndSortInteger(Values: PIntegerArray; ValuesCount: integer;
   var Dest: TIntegerDynArray);
 
 /// copy an integer array, then sort it, low values first
+/// 复制一个整数数组，然后对其进行排序，低值优先
 procedure CopyAndSortInt64(Values: PInt64Array; ValuesCount: integer;
   var Dest: TInt64DynArray);
 
 /// remove some 32-bit integer from Values[]
 // - Excluded is declared as var, since it will be sorted in-place during process
 // if it contains more than ExcludedSortSize items (i.e. if the sort is worth it)
+/// 从 Values[] 中删除一些 32 位整数
+// - Excluded 被声明为 var，因为如果它包含的项超过 ExcludedSortSize（即，如果排序值得），那么它将在处理过程中就地排序
 procedure ExcludeInteger(var Values, Excluded: TIntegerDynArray;
   ExcludedSortSize: integer = 32);
 
 /// ensure some 32-bit integer from Values[] will only contain Included[]
 // - Included is declared as var, since it will be sorted in-place during process
 // if it contains more than IncludedSortSize items (i.e. if the sort is worth it)
+/// 确保 Values[] 中的某些 32 位整数仅包含 Included[]
+// - Included 被声明为 var，因为如果它包含超过 IncludedSortSize 的项目（即，如果排序值得），它将在处理过程中就地排序
 procedure IncludeInteger(var Values, Included: TIntegerDynArray;
   IncludedSortSize: integer = 32);
 
 /// sort and remove any 32-bit duplicated integer from Values[]
+/// 对 Values[] 中的所有 32 位重复整数进行排序并删除
 procedure DeduplicateInteger(var Values: TIntegerDynArray); overload;
 
 /// sort and remove any 32-bit duplicated integer from Values[]
 // - returns the new Values[] length
+/// 对 Values[] 中的所有 32 位重复整数进行排序并删除
+// - 返回新的 Values[] 长度
 function DeduplicateInteger(var Values: TIntegerDynArray; Count: PtrInt): PtrInt; overload;
 
 /// low-level function called by DeduplicateInteger()
+/// DeduplicateInteger() 调用的低级函数
 function DeduplicateIntegerSorted(val: PIntegerArray; last: PtrInt): PtrInt;
 
 /// create a new 32-bit integer dynamic array with the values from another one
+/// 使用另一个数组中的值创建一个新的 32 位整数动态数组
 procedure CopyInteger(const Source: TIntegerDynArray; out Dest: TIntegerDynArray);
 
 /// remove some 64-bit integer from Values[]
 // - Excluded is declared as var, since it will be sorted in-place during process
 // if it contains more than ExcludedSortSize items (i.e. if the sort is worth it)
+/// 从 Values[] 中删除一些 64 位整数
+// - Excluded 被声明为 var，因为如果它包含的项超过 ExcludedSortSize（即，如果排序值得），那么它将在处理过程中就地排序
 procedure ExcludeInt64(var Values, Excluded: TInt64DynArray;
   ExcludedSortSize: integer = 32);
 
 /// ensure some 64-bit integer from Values[] will only contain Included[]
 // - Included is declared as var, since it will be sorted in-place during process
 // if it contains more than IncludedSortSize items (i.e. if the sort is worth it)
+/// 确保 Values[] 中的某些 64 位整数仅包含 Included[]
+// - Included 被声明为 var，因为如果它包含超过 IncludedSortSize 的项目（即，如果排序值得），它将在处理过程中就地排序
 procedure IncludeInt64(var Values, Included: TInt64DynArray;
   IncludedSortSize: integer = 32);
 
 /// sort and remove any 64-bit duplicated integer from Values[]
+/// 对 Values[] 中的所有 64 位重复整数进行排序并删除
 procedure DeduplicateInt64(var Values: TInt64DynArray); overload;
 
 /// sort and remove any 64-bit duplicated integer from Values[]
 // - returns the new Values[] length
+/// 对 Values[] 中的所有 64 位重复整数进行排序并删除
+// - 返回新的 Values[] 长度
 function DeduplicateInt64(var Values: TInt64DynArray; Count: PtrInt): PtrInt; overload;
 
 /// low-level function called by DeduplicateInt64()
 // - warning: caller should ensure that last>0
+/// DeduplicateInt64() 调用的低级函数
+// - 警告：调用者应确保last>0
 function DeduplicateInt64Sorted(val: PInt64Array; last: PtrInt): PtrInt;
 
 /// create a new 64-bit integer dynamic array with the values from another one
+/// 使用另一个数组中的值创建一个新的 64 位整数动态数组
 procedure CopyInt64(const Source: TInt64DynArray; out Dest: TInt64DynArray);
 
 /// find the maximum 32-bit integer in Values[]
+/// 查找Values[]中最大的32位整数
 function MaxInteger(const Values: TIntegerDynArray; ValuesCount: PtrInt;
   MaxStart: integer = -1): integer;
 
 /// sum all 32-bit integers in Values[]
+/// 对 Values[] 中的所有 32 位整数求和
 function SumInteger(const Values: TIntegerDynArray; ValuesCount: PtrInt): integer;
 
 /// fill already allocated Reversed[] so that Reversed[Values[i]]=i
+/// 填充已经分配的 Reversed[] 使得 Reversed[Values[i]]=i
 procedure Reverse(const Values: TIntegerDynArray; ValuesCount: PtrInt;
   Reversed: PIntegerArray);
 
 /// copy some Int64 values into an unsigned integer array
+/// 将一些 Int64 值复制到无符号整数数组中
 procedure Int64ToUInt32(Values64: PInt64Array; Values32: PCardinalArray; Count: PtrInt);
 
 type
   /// comparison function as expected by MedianQuickSelect()
   // - should return TRUE if Values[IndexA]>Values[IndexB]
+  /// 正如 MedianQuickSelect() 所期望的比较函数
+   // - 如果 Values[IndexA]>Values[IndexB] 应返回 TRUE
   TOnValueGreater = function(IndexA, IndexB: PtrInt): boolean of object;
 
 /// compute the median of a serie of values, using "Quickselect"
@@ -3313,6 +3484,12 @@ type
 // (supplied as a TSynTempBuffer), so won't change the supplied values themself
 // - see also function MedianQuickSelectInteger() for PIntegerArray values
 // - returns the index of the median Value
+/// 使用“Quickselect”计算一系列值的中位数
+// - 基于“C 中的数值食谱”第二版中描述的算法
+// - 期望从比较回调中获得值信息
+// - 此版本将使用临时索引列表来交换项目顺序（作为 TSynTempBuffer 提供），因此不会自行更改提供的值
+// - 另请参阅函数 MedianQuickSelectInteger() 了解 PIntegerArray 值
+// - 返回中值的索引
 function MedianQuickSelect(const OnCompare: TOnValueGreater; n: integer;
   var TempBuffer: TSynTempBuffer): integer;
 
@@ -3321,6 +3498,9 @@ function MedianQuickSelect(const OnCompare: TOnValueGreater; n: integer;
 // translated from Nicolas Devillard's C code: http://ndevilla.free.fr/median/median
 // - warning: the supplied integer array is modified in-place during the process,
 // and won't be fully sorted on output (this is no QuickSort alternative)
+/// 使用“Quickselect”计算整数系列值的中位数
+// - 基于“C 中的数值食谱”第二版中描述的算法，翻译自 Nicolas Devillard 的 C 代码：http://ndevilla.free.fr/median/median
+// - 警告：提供的整数数组在处理过程中被就地修改，并且不会在输出上完全排序（这不是 QuickSort 的替代方案）
 function MedianQuickSelectInteger(Values: PIntegerArray; n: integer): integer;
 
 
@@ -3328,25 +3508,37 @@ function MedianQuickSelectInteger(Values: PIntegerArray; n: integer): integer;
 // - Count is the number of entries in P^[]
 // - return index of P^[index]=V^, comparing VSize bytes
 // - return -1 if Value was not found
+/// 快速搜索固定大小数组中的二进制值位置
+// - Count 是 P^[] 中的条目数
+// - 返回 P^[index]=V^ 的索引，比较 VSize 字节
+// - 如果未找到值，则返回 -1
 function AnyScanIndex(P, V: pointer; Count, VSize: PtrInt): PtrInt;
 
 /// fast search of a binary value position in a fixed-size array
 // - Count is the number of entries in P^[]
+/// 快速搜索固定大小数组中的二进制值位置
+// - Count 是 P^[] 中的条目数
 function AnyScanExists(P, V: pointer; Count, VSize: PtrInt): boolean;
   {$ifdef HASINLINE} inline; {$endif}
 
 
 { ************ INI Files and In-memory Access }
+{ ************ INI 文件和内存访问 }
 
 /// find a Name= Value in a [Section] of a INI RawUtf8 Content
 // - this function scans the Content memory buffer, and is
 // therefore very fast (no temporary TMemIniFile is created)
 // - if Section equals '', find the Name= value before any [Section]
+/// 在 INI RawUtf8 内容的 [Section] 中查找 Name= Value
+// - 该函数扫描内容内存缓冲区，因此速度非常快（不会创建临时 TMemIniFile）
+// - 如果Section 等于''，则在任何[Section] 之前查找Name= 值
 function FindIniEntry(const Content, Section, Name: RawUtf8;
   const DefaultValue: RawUtf8 = ''): RawUtf8;
 
 /// find a Name= Value in a [Section] of a INI WinAnsi Content
 // - same as FindIniEntry(), but the value is converted from WinAnsi into UTF-8
+/// 在 INI WinAnsi 内容的 [Section] 中查找 Name= Value
+// - 与 FindIniEntry() 相同，但值从 WinAnsi 转换为 UTF-8
 function FindWinAnsiIniEntry(const Content, Section, Name: RawUtf8): RawUtf8;
 
 /// find a Name= numeric Value in a [Section] of a INI RawUtf8 Content and
@@ -3354,12 +3546,18 @@ function FindWinAnsiIniEntry(const Content, Section, Name: RawUtf8): RawUtf8;
 // - this function scans the Content memory buffer, and is
 // therefore very fast (no temporary TMemIniFile is created)
 // - if Section equals '', find the Name= value before any [Section]
+/// 在 INI RawUtf8 内容的 [Section] 中查找 Name= numeric Value 并将其作为整数返回，如果未找到则返回 0
+// - 该函数扫描内容内存缓冲区，因此速度非常快（不会创建临时 TMemIniFile）
+// - 如果Section 等于''，则在任何[Section] 之前查找Name= 值
 function FindIniEntryInteger(const Content, Section, Name: RawUtf8): integer;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// find a Name= Value in a [Section] of a .INI file
 // - if Section equals '', find the Name= value before any [Section]
 // - use internally fast FindIniEntry() function above
+/// 在 .INI 文件的 [Section] 中查找 Name= Value
+// - 如果Section 等于''，则在任何[Section] 之前查找Name= 值
+// - 使用上面的内部快速 FindIniEntry() 函数
 function FindIniEntryFile(const FileName: TFileName;
   const Section, Name: RawUtf8; const DefaultValue: RawUtf8 = ''): RawUtf8;
 
@@ -3367,28 +3565,43 @@ function FindIniEntryFile(const FileName: TFileName;
 // - this function scans and update the Content memory buffer, and is
 // therefore very fast (no temporary TMemIniFile is created)
 // - if Section equals '', update the Name= value before any [Section]
+/// 更新 INI RawUtf8 内容的 [Section] 中的 Name= Value
+// - 该函数扫描并更新内容内存缓冲区，因此速度非常快（不会创建临时 TMemIniFile）
+// - 如果Section等于''，则更新任何[Section]之前的Name=值
 procedure UpdateIniEntry(var Content: RawUtf8; const Section, Name, Value: RawUtf8);
 
 /// update a Name= Value in a [Section] of a .INI file
 // - if Section equals '', update the Name= value before any [Section]
 // - use internally fast UpdateIniEntry() function above
+/// 更新 .INI 文件的 [Section] 中的 Name= Value
+// - 如果Section等于''，则更新任何[Section]之前的Name=值
+// - 使用上面的内部快速 UpdateIniEntry() 函数
 procedure UpdateIniEntryFile(const FileName: TFileName; const Section, Name, Value: RawUtf8);
 
 /// find the position of the [SEARCH] section in source
 // - return true if [SEARCH] was found, and store pointer to the line after it in source
+/// 查找源代码中[SEARCH]部分的位置
+// - 如果找到 [SEARCH]，则返回 true，并将指针存储到源中其后的行
 function FindSectionFirstLine(var source: PUtf8Char; search: PAnsiChar): boolean;
 
 /// find the position of the [SEARCH] section in source
 // - return true if [SEARCH] was found, and store pointer to the line after it in source
 // - this version expects source^ to point to an Unicode char array
+/// 查找源代码中[SEARCH]部分的位置
+// - 如果找到 [SEARCH]，则返回 true，并将指针存储到源中其后的行
+// - 此版本期望 source^ 指向 Unicode 字符数组
 function FindSectionFirstLineW(var source: PWideChar; search: PUtf8Char): boolean;
 
 /// retrieve the whole content of a section as a string
 // - SectionFirstLine may have been obtained by FindSectionFirstLine() function above
+/// 以字符串形式检索部分的全部内容
+// - SectionFirstLine 可能已通过上面的 FindSectionFirstLine() 函数获得
 function GetSectionContent(SectionFirstLine: PUtf8Char): RawUtf8; overload;
 
 /// retrieve the whole content of a section as a string
 // - use SectionFirstLine() then previous GetSectionContent()
+/// 以字符串形式检索部分的全部内容
+// - 使用SectionFirstLine()，然后使用前面的GetSectionContent()
 function GetSectionContent(const Content, SectionName: RawUtf8): RawUtf8; overload;
 
 /// delete a whole [Section]
@@ -3396,6 +3609,10 @@ function GetSectionContent(const Content, SectionName: RawUtf8): RawUtf8; overlo
 // deleted together with its content lines
 // - return TRUE if something was changed in Content
 // - return FALSE if [Section] doesn't exist or is already void
+/// 删除整个[Section]
+// - 如果 EraseSectionHeader 为 TRUE（默认），则 [Section] 行也将与其内容行一起删除
+// - 如果内容发生更改，则返回 TRUE
+// - 如果 [Section] 不存在或已为空，则返回 FALSE
 function DeleteSection(var Content: RawUtf8; const SectionName: RawUtf8;
   EraseSectionHeader: boolean = true): boolean; overload;
 
@@ -3405,26 +3622,40 @@ function DeleteSection(var Content: RawUtf8; const SectionName: RawUtf8;
 // - return TRUE if something was changed in Content
 // - return FALSE if [Section] doesn't exist or is already void
 // - SectionFirstLine may have been obtained by FindSectionFirstLine() function above
+/// 删除整个[Section]
+// - 如果 EraseSectionHeader 为 TRUE（默认），则 [Section] 行也将与其内容行一起删除
+// - 如果内容发生更改，则返回 TRUE
+// - 如果 [Section] 不存在或已为空，则返回 FALSE
+// - SectionFirstLine 可能已通过上面的 FindSectionFirstLine() 函数获得
 function DeleteSection(SectionFirstLine: PUtf8Char; var Content: RawUtf8;
   EraseSectionHeader: boolean = true): boolean; overload;
 
 /// replace a whole [Section] content by a new content
 // - create a new [Section] if none was existing
+/// 用新内容替换整个 [Section] 内容
+// - 如果不存在则创建一个新的 [Section]
 procedure ReplaceSection(var Content: RawUtf8; const SectionName,
   NewSectionContent: RawUtf8); overload;
 
 /// replace a whole [Section] content by a new content
 // - create a new [Section] if none was existing
 // - SectionFirstLine may have been obtained by FindSectionFirstLine() function above
+/// 用新内容替换整个 [Section] 内容
+// - 如果不存在则创建一个新的 [Section]
+// - SectionFirstLine 可能已通过上面的 FindSectionFirstLine() 函数获得
 procedure ReplaceSection(SectionFirstLine: PUtf8Char;
   var Content: RawUtf8; const NewSectionContent: RawUtf8); overload;
 
 /// return TRUE if Value of UpperName does exist in P, till end of current section
 // - expect UpperName as 'NAME='
+/// 如果 UpperName 的值确实存在于 P 中，则返回 TRUE，直到当前节结束
+// - 期望 UpperName 为 'NAME='
 function ExistsIniName(P: PUtf8Char; UpperName: PAnsiChar): boolean;
 
 /// find the Value of UpperName in P, till end of current section
 // - expect UpperName as 'NAME='
+/// 查找 P 中 UpperName 的值，直到当前节结束
+// - 期望 UpperName 为 'NAME='
 function FindIniNameValue(P: PUtf8Char; UpperName: PAnsiChar;
   const DefaultValue: RawUtf8 = ''): RawUtf8;
 
@@ -3433,18 +3664,29 @@ function FindIniNameValue(P: PUtf8Char; UpperName: PAnsiChar;
 // - expect UpperName e.g. as 'CONTENT-TYPE: '
 // - expect UpperValues to be an array of upper values with left side matching,
 // and ending with nil - as expected by IdemPPChar(), i.e. with at least 2 chars
+/// 如果 UpperName 的值之一存在于 P 中，则返回 TRUE，直到当前节结束
+// - 期望 UpperName 例如 作为“内容类型：”
+// - 期望 UpperValues 是左侧匹配的上限值数组，并以 nil 结尾 - 正如 IdemPPChar() 所期望的，即至少有 2 个字符
 function ExistsIniNameValue(P: PUtf8Char; const UpperName: RawUtf8;
   UpperValues: PPAnsiChar): boolean;
 
 /// find the integer Value of UpperName in P, till end of current section
 // - expect UpperName as 'NAME='
 // - return 0 if no NAME= entry was found
+/// 查找P中UpperName的整数值，直到当前节结束
+// - 期望 UpperName 为 'NAME='
+// - 如果未找到 NAME= 条目，则返回 0
 function FindIniNameValueInteger(P: PUtf8Char; const UpperName: RawUtf8): PtrInt;
 
 /// replace a value from a given set of name=value lines
 // - expect UpperName as 'UPPERNAME=', otherwise returns false
 // - if no UPPERNAME= entry was found, then Name+NewValue is added to Content
 // - a typical use may be:
+// ! UpdateIniNameValue(headers,HEADER_CONTENT_TYPE,HEADER_CONTENT_TYPE_UPPER,contenttype);
+/// 替换给定的一组 name=value 行中的值
+// - 期望 UpperName 为 'UPPERNAME='，否则返回 false
+// - 如果未找到 UPPERNAME= 条目，则将 Name+NewValue 添加到内容中
+// - 典型用途可能是：
 // ! UpdateIniNameValue(headers,HEADER_CONTENT_TYPE,HEADER_CONTENT_TYPE_UPPER,contenttype);
 function UpdateIniNameValue(var Content: RawUtf8;
   const Name, UpperName, NewValue: RawUtf8): boolean;
@@ -3454,6 +3696,10 @@ function UpdateIniNameValue(var Content: RawUtf8;
 // - nested objects and multi-line text values are searched in their own section,
 // named from their section level and property (e.g. [mainprop.nested1.nested2])
 // - returns true if at least one property has been identified
+/// 从 .ini 内容填充类实例属性
+// - 在提供的主SectionName中搜索类属性字段
+// - 嵌套对象和多行文本值在其自己的部分中搜索，根据其部分级别和属性命名（例如 [mainprop.nested1.nested2]）
+// - 如果至少已识别出一个属性，则返回 true
 function IniToObject(const Ini: RawUtf8; Instance: TObject;
   const SectionName: RawUtf8 = 'Main'; DocVariantOptions: PDocVariantOptions = nil;
   Level: integer = 0): boolean;
@@ -3462,6 +3708,9 @@ function IniToObject(const Ini: RawUtf8; Instance: TObject;
 // - the class property fields are written in the supplied main SectionName
 // - nested objects and multi-line text values are written in their own section,
 // named from their section level and property (e.g. [mainprop.nested1.nested2])
+/// 将类实例属性序列化为.ini内容
+// - 类属性字段写入提供的主SectionName中
+// - 嵌套对象和多行文本值写入自己的部分，根据其部分级别和属性命名（例如 [mainprop.nested1.nested2]）
 function ObjectToIni(const Instance: TObject; const SectionName: RawUtf8 = 'Main';
   Options: TTextWriterWriteObjectOptions =
     [woEnumSetsAsText, woRawBlobAsBase64, woHumanReadableEnumSetAsComment];
@@ -3469,20 +3718,27 @@ function ObjectToIni(const Instance: TObject; const SectionName: RawUtf8 = 'Main
 
 /// returns TRUE if the supplied HTML Headers contains 'Content-Type: text/...',
 // 'Content-Type: application/json' or 'Content-Type: application/xml'
+/// 如果提供的 HTML 标头包含 'Content-Type: text/...'、Content-Type: application/json' 或 'Content-Type: application/xml'，则返回 TRUE
 function IsHtmlContentTypeTextual(Headers: PUtf8Char): boolean;
   {$ifdef HASINLINE}inline;{$endif}
 
 /// search if the WebSocketUpgrade() header is present
 // - consider checking the hsrConnectionUpgrade flag instead
+/// 搜索 WebSocketUpgrade() 标头是否存在
+// - 考虑检查 hsrConnectionUpgrade 标志
 function IsWebSocketUpgrade(headers: PUtf8Char): boolean;
 
 
 { ************ RawUtf8 String Values Interning and TRawUtf8List }
+{ ************ RawUtf8 字符串值实习和 TRawUtf8List }
 
 type
   /// used to store one list of hashed RawUtf8 in TRawUtf8Interning pool
   // - Delphi "object" is buggy on stack -> also defined as record with methods
   // - each slot has its own TRWLightLock for efficient concurrent reads
+  /// 用于在 TRawUtf8Interning 池中存储一个经过哈希处理的 RawUtf8 列表
+   // - Delphi“对象”在堆栈上存在错误 -> 也定义为带有方法的记录
+   // - 每个槽都有自己的 TRWLightLock 以实现高效的并发读取
   {$ifdef USERECORDWITHMETHODS}
   TRawUtf8InterningSlot = record
   {$else}
@@ -3495,24 +3751,34 @@ type
     fValues: TDynArrayHashed;
   public
     /// initialize the RawUtf8 slot (and its Safe mutex)
+	/// 初始化 RawUtf8 槽（及其安全互斥体）
     procedure Init;
     /// returns the interned RawUtf8 value
+	/// 返回内部的 RawUtf8 值
     procedure Unique(var aResult: RawUtf8; const aText: RawUtf8;
       aTextHash: cardinal);
     /// returns the interned RawUtf8 value
     // - only allocates new aResult string if needed
+	/// 返回内部的 RawUtf8 值
+     // - 仅在需要时分配新的 aResult 字符串
     procedure UniqueFromBuffer(var aResult: RawUtf8;
       aText: PUtf8Char; aTextLen: PtrInt; aTextHash: cardinal);
     /// ensure the supplied RawUtf8 value is interned
+	/// 确保提供的 RawUtf8 值被保留
     procedure UniqueText(var aText: RawUtf8; aTextHash: cardinal);
     /// return the interned value, if any
+	/// 返回实习值（如果有）
     function Existing(const aText: RawUtf8; aTextHash: cardinal): pointer;
     /// delete all stored RawUtf8 values
+	/// 删除所有存储的 RawUtf8 值
     procedure Clear;
     /// reclaim any unique RawUtf8 values
     // - any string with an usage count <= aMaxRefCount will be removed
+	/// 回收任何唯一的 RawUtf8 值
+     // - 任何使用计数 <= aMaxRefCount 的字符串都将被删除
     function Clean(aMaxRefCount: TStrCnt): integer;
     /// how many items are currently stored in Value[]
+	/// Value[] 中当前存储了多少项
     property Count: integer
       read fCount;
   end;
@@ -3522,6 +3788,9 @@ type
   // - thanks to the Copy-On-Write feature of string variables, this may
   // reduce a lot the memory overhead of duplicated text content
   // - this class is thread-safe and optimized for performance
+  /// 允许仅存储不同 RawUtf8 值的一份副本
+   // - 由于字符串变量的 Copy-On-Write 特性，这可能会减少大量重复文本内容的内存开销
+   // - 此类是线程安全的并针对性能进行了优化
   TRawUtf8Interning = class(TRawUtf8InterningAbstract)
   protected
     fPool: array of TRawUtf8InterningSlot;
@@ -3530,55 +3799,86 @@ type
     /// initialize the storage and its internal hash pools
     // - aHashTables is the pool size, and should be a power of two <= 512
     // (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
+	/// 初始化存储及其内部哈希池
+     // - aHashTables 是池大小，应该是 2 的幂 <= 512 (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
     constructor Create(aHashTables: integer = 4); reintroduce;
     /// return a RawUtf8 variable stored within this class
     // - if aText occurs for the first time, add it to the internal string pool
     // - if aText does exist in the internal string pool, return the shared
     // instance (with its reference counter increased), to reduce memory usage
+	/// 返回存储在此类中的 RawUtf8 变量
+     // - 如果aText第一次出现，将其添加到内部字符串池中
+     // - 如果aText确实存在于内部字符串池中，则返回共享实例（其引用计数器增加），以减少内存使用
     function Unique(const aText: RawUtf8): RawUtf8; overload;
     /// check if a RawUtf8 value is already stored within this class
     // - if not existing, returns nil and don't add it to the pool
     // - if existing, returns pointer(fValue[i]) of the unique stored RawUtf8
     // - use e.g. for very fast per-pointer lookup of interned property names
+	/// 检查 RawUtf8 值是否已存储在此类中
+     // - 如果不存在，则返回 nil 并且不将其添加到池中
+     // - 如果存在，则返回唯一存储的 RawUtf8 的指针(fValue[i])
+     // - 使用例如 用于非常快速地按指针查找实习属性名称
     function Existing(const aText: RawUtf8): pointer;
     /// return a RawUtf8 variable stored within this class from a text buffer
     // - if aText occurs for the first time, add it to the internal string pool
     // - if aText does exist in the internal string pool, return the shared
     // instance (with its reference counter increased), to reduce memory usage
+	/// 从文本缓冲区返回存储在此类中的 RawUtf8 变量
+     // - 如果aText第一次出现，将其添加到内部字符串池中
+     // - 如果aText确实存在于内部字符串池中，则返回共享实例（其引用计数器增加），以减少内存使用
     function Unique(aText: PUtf8Char; aTextLen: PtrInt): RawUtf8; overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// return a RawUtf8 variable stored within this class
     // - if aText occurs for the first time, add it to the internal string pool
     // - if aText does exist in the internal string pool, return the shared
     // instance (with its reference counter increased), to reduce memory usage
+	/// 返回存储在此类中的 RawUtf8 变量
+     // - 如果aText第一次出现，将其添加到内部字符串池中
+     // - 如果aText确实存在于内部字符串池中，则返回共享实例（其引用计数器增加），以减少内存使用
     procedure Unique(var aResult: RawUtf8; const aText: RawUtf8); overload;
     /// return a RawUtf8 variable stored within this class from a text buffer
     // - if aText occurs for the first time, add it to the internal string pool
     // - if aText does exist in the internal string pool, return the shared
     // instance (with its reference counter increased), to reduce memory usage
     // - this method won't allocate any memory if aText is already interned
+	/// 从文本缓冲区返回存储在此类中的 RawUtf8 变量
+     // - 如果aText第一次出现，将其添加到内部字符串池中
+     // - 如果aText确实存在于内部字符串池中，则返回共享实例（其引用计数器增加），以减少内存使用
+     // - 如果 aText 已经被保留，此方法将不会分配任何内存
     procedure Unique(var aResult: RawUtf8; aText: PUtf8Char; aTextLen: PtrInt); overload;
     /// ensure a RawUtf8 variable is stored within this class
     // - if aText occurs for the first time, add it to the internal string pool
     // - if aText does exist in the internal string pool, set the shared
     // instance (with its reference counter increased), to reduce memory usage
+	/// 确保 RawUtf8 变量存储在此类中
+     // - 如果aText第一次出现，将其添加到内部字符串池中
+     // - 如果aText确实存在于内部字符串池中，则设置共享实例（增加其引用计数器），以减少内存使用
     procedure UniqueText(var aText: RawUtf8);
     /// return a variant containing a RawUtf8 stored within this class
     // - similar to RawUtf8ToVariant(), but with string interning
     // - see also UniqueVariant() from mormot.core.variants if you want to
     // intern only non-numerical values
+	/// 返回包含存储在此类中的 RawUtf8 的变体
+     // - 与 RawUtf8ToVariant() 类似，但带有字符串驻留
+     // - 如果您只想实习非数字值，另请参阅 mormot.core.variants 中的 UniqueVariant()
     procedure UniqueVariant(var aResult: variant; const aText: RawUtf8); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// return a variant containing a RawUtf8 stored within this class
     // - similar to RawUtf8ToVariant(StringToUtf8()), but with string interning
     // - this method expects the text to be supplied as a VCL string, which will
     // be converted into a variant containing a RawUtf8 varString instance
+	/// 返回包含存储在此类中的 RawUtf8 的变体
+     // - 与 RawUtf8ToVariant(StringToUtf8()) 类似，但带有字符串驻留
+     // - 此方法期望文本作为 VCL 字符串提供，该字符串将转换为包含 RawUtf8 varString 实例的变体
     procedure UniqueVariantString(var aResult: variant; const aText: string);
     /// ensure a variant contains only RawUtf8 stored within this class
     // - supplied variant should be a varString containing a RawUtf8 value
+	/// 确保变体仅包含存储在此类中的 RawUtf8
+     // - 提供的变体应该是包含 RawUtf8 值的 varString
     procedure UniqueVariant(var aResult: variant); overload;
       {$ifdef HASINLINE}inline;{$endif}
     /// delete any previous storage pool
+	/// 删除之前的任何存储池
     procedure Clear;
     /// reclaim any unique RawUtf8 values
     // - i.e. run a garbage collection process of all values with RefCount=1
@@ -3588,8 +3888,14 @@ type
     // - returns the number of unique RawUtf8 cleaned from the internal pool
     // - to be executed on a regular basis - but not too often, since the
     // process can be time consumming, and void the benefit of interning
+	/// 回收任何唯一的 RawUtf8 值
+     // - 即默认情况下对 RefCount=1 的所有值（即不再使用的所有字符串）运行垃圾收集过程； 
+	 // 您可以根据您的期望将 aMaxRefCount 设置为更高的值，即 2 删除仅在池外引用一次的所有字符串
+     // - 返回从内部池中清除的唯一 RawUtf8 的数量
+     // - 定期执行 - 但不要太频繁，因为该过程可能非常耗时，并且会失去实习的好处
     function Clean(aMaxRefCount: TStrCnt = 1): integer;
     /// how many items are currently stored in this instance
+	/// 此实例中当前存储了多少项
     function Count: integer;
   end;
 
@@ -3607,6 +3913,11 @@ type
   // - if fNoDuplicate flag is defined, an internal hash table will be
   // maintained to perform IndexOf() lookups in O(1) linear way
   // - not thread-safe by default, unless fThreadSafe is set to use the TRWLock
+  /// 针对我们本机 UTF-8 字符串类型优化的线程安全 TStringList 类
+   // - 可以选择存储关联的一些 TObject 实例
+   // - 此类的高级方法是线程安全的
+   // - 如果定义了 fNoDuplicate 标志，将维护一个内部哈希表以 O(1) 线性方式执行 IndexOf() 查找
+   // - 默认情况下不是线程安全的，除非将 fThreadSafe 设置为使用 TRWLock
   TRawUtf8List = class(TSynPersistentRWLock)
   protected
     fCount: PtrInt;
@@ -3650,6 +3961,7 @@ type
     {$endif PUREMORMOT2}
   public
     /// initialize the RawUtf8/Objects storage with [fCaseSensitive] flags
+    /// 使用 [fCaseSensitive] 标志初始化 RawUtf8/Objects 存储
     constructor Create; overload; override;
     /// initialize the RawUtf8/Objects storage with extended flags
     // - by default, any associated Objects[] are just weak references;
@@ -3660,26 +3972,44 @@ type
     // - not thread-safe by default, unless fThreadSafe is set to use a R/W lock
     // - is defined as CreateEx instead of overload Create to avoid weird Delphi
     // compilation issues, especially within packages
+	/// 使用扩展标志初始化 RawUtf8/Objects 存储
+     // - 默认情况下，任何关联的 Objects[] 只是弱引用； 您可以提供 fOwnObjects 标志来强制对象实例管理
+     // - 如果您希望存储的文本项是唯一的，请设置 fNoDuplicate，然后将为快速 IndexOf() 维护一个内部哈希表
+     // - 您可以设置 fCaseSensitive 以使 UTF-8 查找区分大小写
+     // - 默认情况下不是线程安全的，除非 fThreadSafe 设置为使用 R/W 锁
+     // - 定义为 CreateEx 而不是重载 Create 以避免奇怪的 Delphi 编译问题，尤其是在包内
     constructor CreateEx(aFlags: TRawUtf8ListFlags);
     {$ifndef PUREMORMOT2}
     /// backward compatiliby overloaded constructor
     // - please rather use the overloaded CreateEx(TRawUtf8ListFlags)
     // - for instance, Create(true) is CreateEx([fObjectsOwned, fCaseSensitive]);
+	/// 向后兼容重载构造函数
+     // - 请使用重载的 CreateEx(TRawUtf8ListFlags)
+     // - 例如，Create(true) 是 CreateEx([fObjectsOwned, fCaseSensitive]);
     constructor Create(aOwnObjects: boolean; aNoDuplicate: boolean = false;
       aCaseSensitive: boolean = true); reintroduce; overload;
     {$endif PUREMORMOT2}
     /// finalize the internal objects stored
     // - if instance was created with fOwnObjects flag
+	/// 最终确定存储的内部对象
+     // - 如果实例是使用 fOwnObjects 标志创建的
     destructor Destroy; override;
     /// get a stored Object item by its associated UTF-8 text
     // - returns nil and raise no exception if aText doesn't exist
     // - thread-safe method, unless returned TObject is deleted in the background
+	/// 通过关联的 UTF-8 文本获取存储的对象项
+     // - 如果 aText 不存在，则返回 nil 且不引发异常
+     // - 线程安全方法，除非返回的TObject在后台被删除
     function GetObjectFrom(const aText: RawUtf8): pointer;
     /// store a new RawUtf8 item
     // - without the fNoDuplicate flag, it will always add the supplied value
     // - if fNoDuplicate was set and aText already exists (using the internal
     // hash table), it will return -1 unless aRaiseExceptionIfExisting is forced
     // - thread-safe method
+	/// 存储一个新的 RawUtf8 项目
+     // - 如果没有 fNoDuplicate 标志，它将始终添加提供的值
+     // - 如果设置了 fNoDuplicate 并且 aText 已经存在（使用内部哈希表），它将返回 -1，除非强制 aRaiseExceptionIfExisting
+     // - 线程安全方法
     function Add(const aText: RawUtf8;
       aRaiseExceptionIfExisting: boolean = false): PtrInt;
       {$ifdef HASINLINE}inline;{$endif}
@@ -3693,6 +4023,13 @@ type
     // if aFreeAndReturnExistingObject is nil, and aReplaceExistingObject is
     // true, the existing object is freed and replaced by aObject
     // - thread-safe method
+	/// 存储一个新的 RawUtf8 项及其关联的 TObject
+     // - 如果没有 fNoDuplicate 标志，它将始终添加提供的值
+     // - 如果设置了 fNoDuplicate 并且 aText 已经存在（使用内部哈希表），
+	 // 它将返回 -1，除非强制使用 aRaiseExceptionIfExisting； 如果设置了 aFreeAndReturnExistingObject，
+	 // 则可以选择释放提供的 aObject，其中复制现有 Objects[] 的指针（请参阅 AddObjectUnique 作为此行为的便捷包装器）； 
+	 // 如果 aFreeAndReturnExistingObject 为 nil，并且 aReplaceExistingObject 为 true，则现有对象将被释放并替换为 aObject
+     // - 线程安全方法
     function AddObject(const aText: RawUtf8; aObject: TObject;
       aRaiseExceptionIfExisting: boolean = false;
       aFreeAndReturnExistingObject: PPointer = nil;
@@ -3707,6 +4044,14 @@ type
     // - thread-safe method, using an internal Hash Table to speedup IndexOf()
     // - in fact, this method is just a wrapper around
     // ! AddObject(aText,aObjectToAddOrFree^,false,@aObjectToAddOrFree);
+	/// 尝试存储一个新的 RawUtf8 项及其关联的 TObject
+     // - fNoDuplicate 应该在列表标志中指定
+     // - 如果aText不存在，将添加值
+     // - 如果 aText 存在，将调用 aObjectToAddOrFree.Free 并将已存储在 Objects[] 中的值 
+	 // 设置为 aObjectToAddOrFree - 允许双重提交线程安全的列表更新，例如 上次调用 GetObjectFrom(aText) 失败后
+     // - 线程安全方法，使用内部哈希表来加速 IndexOf()
+     // - 事实上，这个方法只是一个包装器
+     // ! AddObject(aText,aObjectToAddOrFree^,false,@aObjectToAddOrFree);
     procedure AddObjectUnique(const aText: RawUtf8; aObjectToAddOrFree: PPointer);
       {$ifdef HASINLINE}inline;{$endif}
     /// force the storage of a RawUtf8 item, and its associated TObject
@@ -3714,53 +4059,92 @@ type
     // - if fNoDuplicate was set and aText already exists (using the internal hash
     // table), it will free any existing Objects[] and put aObject in its place
     // - thread-safe method, using an internal Hash Table to speedup IndexOf()
+	/// 强制存储 RawUtf8 项及其关联的 TObject
+     // - 如果没有 fNoDuplicate 标志，它将始终添加提供的值
+     // - 如果设置了 fNoDuplicate 并且 aText 已经存在（使用内部哈希
+     // table)，它将释放任何现有的 Objects[] 并将 aObject 放在其位置
+     // - 线程安全方法，使用内部哈希表来加速 IndexOf()
     function AddOrReplaceObject(const aText: RawUtf8; aObject: TObject): PtrInt;
       {$ifdef HASINLINE}inline;{$endif}
     /// append a specified list to the current content
     // - thread-safe method
+	/// 将指定列表附加到当前内容
+     // - 线程安全方法
     procedure AddRawUtf8List(List: TRawUtf8List);
     /// delete a stored RawUtf8 item, and its associated TObject
     // - raise no exception in case of out of range supplied index
     // - this method is not thread-safe: use Safe.Lock/UnLock if needed
+	/// 删除存储的RawUtf8项目及其关联的TObject
+     // - 如果提供的索引超出范围，则不会引发异常
+     // - 此方法不是线程安全的：如果需要，请使用 Safe.Lock/UnLock
     procedure Delete(Index: PtrInt); overload;
     /// delete a stored RawUtf8 item, and its associated TObject
     // - will search for the value using IndexOf(aText), and returns its index
     // - returns -1 if no entry was found and deleted
     // - thread-safe method, using the internal Hash Table if fNoDuplicate is set
+	/// 删除存储的RawUtf8项目及其关联的TObject
+     // - 将使用 IndexOf(aText) 搜索值，并返回其索引
+     // - 如果没有找到并删除条目，则返回 -1
+     // - 线程安全方法，如果设置了 fNoDuplicate，则使用内部哈希表
     function Delete(const aText: RawUtf8): PtrInt; overload;
     /// delete a stored RawUtf8 item, and its associated TObject, from
     // a given Name when stored as 'Name=Value' pairs
     // - raise no exception in case of out of range supplied index
     // - thread-safe method, but not using the internal Hash Table
     // - consider using TSynNameValue if you expect efficient name/value process
+	/// 当存储为“Name=Value”对时，从给定名称中删除存储的 RawUtf8 项及其关联的 TObject
+     // - 如果提供的索引超出范围，则不会引发异常
+     // - 线程安全方法，但不使用内部哈希表
+     // - 如果您期望高效的名称/值处理，请考虑使用 TSynNameValue
     function DeleteFromName(const Name: RawUtf8): PtrInt; virtual;
     /// find the index of a given Name when stored as 'Name=Value' pairs
     // - search on Name is case-insensitive with 'Name=Value' pairs
     // - this method is not thread-safe, and won't use the internal Hash Table
     // - consider using TSynNameValue if you expect efficient name/value process
+	/// 当存储为“Name=Value”对时查找给定名称的索引
+     // - 使用“Name=Value”对搜索名称不区分大小写
+     // - 此方法不是线程安全的，并且不会使用内部哈希表
+     // - 如果您期望高效的名称/值处理，请考虑使用 TSynNameValue
     function IndexOfName(const Name: RawUtf8): PtrInt;
     /// access to the Value of a given 'Name=Value' pair at a given position
     // - this method is not thread-safe
     // - consider using TSynNameValue if you expect efficient name/value process
+	/// 访问给定位置处给定“Name=Value”对的值
+     // - 该方法不是线程安全的
+     // - 如果您期望高效的名称/值处理，请考虑使用 TSynNameValue
     function GetValueAt(Index: PtrInt): RawUtf8;
     /// retrieve Value from an existing Name=Value, then optinally delete the entry
     // - if Name is found, will fill Value with the stored content and return true
     // - if Name is not found, Value is not modified, and false is returned
     // - thread-safe method, but not using the internal Hash Table
     // - consider using TSynNameValue if you expect efficient name/value process
+	/// 从现有的 Name=Value 中检索 Value，然后选择删除该条目
+     // - 如果找到 Name，将用存储的内容填充 Value 并返回 true
+     // - 如果未找到 Name，则不修改 Value，并返回 false
+     // - 线程安全方法，但不使用内部哈希表
+     // - 如果您期望高效的名称/值处理，请考虑使用 TSynNameValue
     function UpdateValue(const Name: RawUtf8; var Value: RawUtf8;
       ThenDelete: boolean): boolean;
     /// retrieve and delete the first RawUtf8 item in the list
     // - could be used as a FIFO, calling Add() as a "push" method
     // - thread-safe method
+	/// 检索并删除列表中的第一个 RawUtf8 项目
+     // - 可以用作 FIFO，调用 Add() 作为“推送”方法
+     // - 线程安全方法
     function PopFirst(out aText: RawUtf8; aObject: PObject = nil): boolean;
     /// retrieve and delete the last RawUtf8 item in the list
     // - could be used as a FILO, calling Add() as a "push" method
     // - thread-safe method
+	/// 检索并删除列表中的最后一个 RawUtf8 项目
+     // - 可以用作 FILO，调用 Add() 作为“push”方法
+     // - 线程安全方法
     function PopLast(out aText: RawUtf8; aObject: PObject = nil): boolean;
     /// erase all stored RawUtf8 items
     // - and corresponding objects (if aOwnObjects was true at constructor)
     // - thread-safe method, also clearing the internal Hash Table
+	/// 删除所有存储的 RawUtf8 项目
+     // - 以及相应的对象（如果 aOwnObjects 在构造函数中为 true）
+     // - 线程安全方法，同时清除内部哈希表
     procedure Clear; virtual;
     /// find a RawUtf8 item in the stored Strings[] list
     // - this search is case sensitive if fCaseSensitive flag was set (which
@@ -3769,114 +4153,184 @@ type
     // and the returned index may not be accurate any more
     // - see also Exists() and GetObjectFrom() method
     // - uses the internal Hash Table if fNoDuplicate was set
+	/// 在存储的 Strings[] 列表中查找 RawUtf8 项
+     // - 如果设置了 fCaseSensitive 标志（这是默认值），则此搜索区分大小写
+     // - 此方法不是线程安全的，因为内部列表可能会更改并且返回的索引可能不再准确
+     // - 另请参见 Exists() 和 GetObjectFrom() 方法
+     // - 如果设置了 fNoDuplicate，则使用内部哈希表
     function IndexOf(const aText: RawUtf8): PtrInt;
     /// find a RawUtf8 item in the stored Strings[] list
     // - search is case sensitive if fCaseSensitive flag was set (default)
     // - this method is thread-safe
     // - uses the internal Hash Table if fNoDuplicate was set
+	/// 在存储的 Strings[] 列表中查找 RawUtf8 项
+     // - 如果设置了 fCaseSensitive 标志，则搜索区分大小写（默认）
+     // - 该方法是线程安全的
+     // - 如果设置了 fNoDuplicate，则使用内部哈希表
     function Exists(const aText: RawUtf8): boolean;
     /// find a TObject item index in the stored Objects[] list
     // - this method is not thread-safe since the internal list may change
     // and the returned index may not be accurate any more
     // - aObject lookup won't use the internal Hash Table
+	/// 在存储的Objects[]列表中查找TObject项索引
+     // - 此方法不是线程安全的，因为内部列表可能会更改并且返回的索引可能不再准确
+     // - aObject 查找不会使用内部哈希表
     function IndexOfObject(aObject: TObject): PtrInt;
     /// search for any RawUtf8 item containing some text
     // - uses PosEx() on the stored lines
     // - this method is not thread-safe since the internal list may change
     // and the returned index may not be accurate any more
     // - by design, aText lookup can't use the internal Hash Table
+	/// 搜索任何包含某些文本的 RawUtf8 项目
+     // - 在存储的行上使用 PosEx()
+     // - 此方法不是线程安全的，因为内部列表可能会更改并且返回的索引可能不再准确
+     // - 根据设计，aText 查找不能使用内部哈希表
     function Contains(const aText: RawUtf8; aFirstIndex: integer = 0): PtrInt;
     /// retrieve the all lines, separated by the supplied delimiter
     // - this method is thread-safe
+	/// 检索所有行，由提供的分隔符分隔
+     // - 该方法是线程安全的
     function GetText(const Delimiter: RawUtf8 = #13#10): RawUtf8;
     /// the OnChange event will be raised only when EndUpdate will be called
     // - this method will also call Safe.Lock for thread-safety
+	/// 仅当调用 EndUpdate 时才会引发 OnChange 事件
+     // - 此方法还将调用 Safe.Lock 以实现线程安全
     procedure BeginUpdate;
     /// call the OnChange event if changes occurred
     // - this method will also call Safe.UnLock for thread-safety
+	/// 如果发生更改，则调用 OnChange 事件
+     // - 此方法还将调用 Safe.UnLock 以实现线程安全
     procedure EndUpdate;
     /// set low-level text and objects from existing arrays
+	/// 从现有数组中设置低级文本和对象
     procedure SetFrom(const aText: TRawUtf8DynArray; const aObject: TObjectDynArray);
     /// set all lines, separated by the supplied delimiter
     // - this method is thread-safe
+    /// 设置所有行，由提供的分隔符分隔
+     // - 该方法是线程安全的
     procedure SetText(const aText: RawUtf8; const Delimiter: RawUtf8 = #13#10);
     /// set all lines from a text file
     // - will assume text file with no BOM is already UTF-8 encoded
     // - this method is thread-safe
+    /// 设置文本文件中的所有行
+     // - 假设没有 BOM 的文本文件已经是 UTF-8 编码的
+     // - 该方法是线程安全的
     procedure LoadFromFile(const FileName: TFileName);
     /// write all lines into the supplied stream
     // - this method is thread-safe
+    /// 将所有行写入提供的流中
+     // - 该方法是线程安全的
     procedure SaveToStream(Dest: TStream; const Delimiter: RawUtf8 = #13#10);
     /// write all lines into a new UTF-8 file
     // - this method is thread-safe
+    /// 将所有行写入新的 UTF-8 文件
+     // - 该方法是线程安全的
     procedure SaveToFile(const FileName: TFileName; const Delimiter: RawUtf8 = #13#10);
     /// return the count of stored RawUtf8
     // - reading this property is not thread-safe, since size may change
+    /// 返回存储的RawUtf8的数量
+     // - 读取此属性不是线程安全的，因为大小可能会改变
     property Count: PtrInt
       read GetCount;
     /// set or retrieve the current memory capacity of the RawUtf8 list
     // - reading this property is not thread-safe, since size may change
+    /// 设置或检索RawUtf8列表的当前内存容量
+     // - 读取此属性不是线程安全的，因为大小可能会改变
     property Capacity: PtrInt
       read GetCapacity write SetCapacity;
     /// set if IndexOf() shall be case sensitive or not
     // - default is TRUE
     // - matches fCaseSensitive in Flags
+    /// 设置 IndexOf() 是否区分大小写
+     // - 默认为 TRUE
+     // - 匹配 Flags 中的 fCaseSensitive
     property CaseSensitive: boolean
       read GetCaseSensitive write SetCaseSensitive;
     /// set if the list doesn't allow duplicated UTF-8 text
     // - if true, an internal hash table is maintained for faster IndexOf()
     // - matches fNoDuplicate in Flags
+    /// 设置列表是否不允许重复的 UTF-8 文本
+     // - 如果为 true，则维护一个内部哈希表以加快 IndexOf() 的速度
+     // - 匹配 Flags 中的 fNoDuplicate
     property NoDuplicate: boolean
       read GetNoDuplicate;
     /// access to the low-level flags of this list
+    /// 访问此列表的低级标志
     property Flags: TRawUtf8ListFlags
       read fFlags write fFlags;
     /// get or set a RawUtf8 item
     // - returns '' and raise no exception in case of out of range supplied index
     // - if you want to use it with the VCL, use Utf8ToString() function
     // - reading this property is not thread-safe, since content may change
+    /// 获取或设置 RawUtf8 项目
+     // - 返回 '' 并且在提供的索引超出范围的情况下不会引发异常
+     // - 如果您想将其与 VCL 一起使用，请使用 Utf8ToString() 函数
+     // - 读取此属性不是线程安全的，因为内容可能会更改
     property Strings[Index: PtrInt]: RawUtf8
       read Get write Put; default;
     /// get or set a Object item
     // - returns nil and raise no exception in case of out of range supplied index
     // - reading this property is not thread-safe, since content may change
+    /// 获取或设置一个对象项
+     // - 返回 nil 并且在提供的索引超出范围的情况下不会引发异常
+     // - 读取此属性不是线程安全的，因为内容可能会更改
     property Objects[Index: PtrInt]: pointer
       read GetObject write PutObject;
     /// retrieve the corresponding Name when stored as 'Name=Value' pairs
     // - reading this property is not thread-safe, since content may change
     // - consider TSynNameValue if you expect more efficient name/value process
+    /// 当存储为“Name=Value”对时检索相应的名称
+     // - 读取此属性不是线程安全的，因为内容可能会更改
+     // - 如果您期望更高效的名称/值处理，请考虑 TSynNameValue
     property Names[Index: PtrInt]: RawUtf8
       read GetName;
     /// access to the corresponding 'Name=Value' pairs
     // - search on Name is case-insensitive with 'Name=Value' pairs
     // - reading this property is thread-safe, but won't use the hash table
     // - consider TSynNameValue if you expect more efficient name/value process
+    /// 访问相应的“Name=Value”对
+     // - 使用“Name=Value”对搜索名称不区分大小写
+     // - 读取此属性是线程安全的，但不会使用哈希表
+     // - 如果您期望更高效的名称/值处理，请考虑 TSynNameValue
     property Values[const Name: RawUtf8]: RawUtf8
       read GetValue write SetValue;
     /// the char separator between 'Name=Value' pairs
     // - equals '=' by default
     // - consider TSynNameValue if you expect more efficient name/value process
+    /// 'Name=Value' 对之间的字符分隔符
+     // - 默认等于 '='
+     // - 如果您期望更高效的名称/值处理，请考虑 TSynNameValue
     property NameValueSep: AnsiChar
       read fNameValueSep write fNameValueSep;
     /// set or retrieve all items as text lines
     // - lines are separated by #13#10 (CRLF) by default; use GetText and
     // SetText methods if you want to use another line delimiter (even a comma)
     // - this property is thread-safe
+    /// 将所有项目设置或检索为文本行
+     // - 默认情况下，行由 #13#10 (CRLF) 分隔； 如果您想使用另一个行分隔符（甚至是逗号），请使用 GetText 和 SetText 方法
+     // - 该属性是线程安全的
     property Text: RawUtf8
       read GetTextCRLF write SetTextCRLF;
     /// Event triggered when an entry is modified
+    /// 条目修改时触发的事件
     property OnChange: TNotifyEvent
       read fOnChange write fOnChange;
     /// direct access to the memory of the TRawUtf8DynArray items
     // - reading this property is not thread-safe, since content may change
+    /// 直接访问内存中的 TRawUtf8DynArray 项
+     // - 读取此属性不是线程安全的，因为内容可能会更改
     property TextPtr: PPUtf8CharArray
       read GetTextPtr;
     /// direct access to the memory of the TObjectDynArray items
     // - reading this property is not thread-safe, since content may change
+    /// 直接访问内存中的TObjectDynArray项
+     // - 读取此属性不是线程安全的，因为内容可能会更改
     property ObjectPtr: PPointerArray
       read GetObjectPtr;
     /// direct access to the TRawUtf8DynArray items dynamic array wrapper
     // - using this property is not thread-safe, since content may change
+    /// 直接访问 TRawUtf8DynArray 项动态数组包装器
+     // - 使用此属性不是线程安全的，因为内容可能会更改
     property ValuesArray: TDynArrayHashed
       read fValues;
   end;
@@ -3886,6 +4340,7 @@ type
 {$ifndef PUREMORMOT2}
 
   // some declarations used for backward compatibility only
+  // 一些声明仅用于向后兼容
   TRawUtf8ListLocked = class(TRawUtf8List)
     protected procedure SetDefaultFlags; override; end;
   TRawUtf8ListHashed = class(TRawUtf8List)
@@ -3893,11 +4348,14 @@ type
   TRawUtf8ListHashedLocked = class(TRawUtf8ListHashed)
     protected procedure SetDefaultFlags; override; end;
   // deprecated TRawUtf8MethodList should be replaced by a TSynDictionary
+  // 已弃用的 TRawUtf8MethodList 应替换为 TSynDictionary
 
 {$endif PUREMORMOT2}
 
 /// sort a dynamic array of PUtf8Char items, via an external array of indexes
 // - you can use FastFindIndexedPUtf8Char() for fast O(log(n)) binary search
+/// 通过外部索引数组对 PUtf8Char 项的动态数组进行排序
+// - 您可以使用 FastFindIndexedPUtf8Char() 进行快速 O(log(n)) 二分搜索
 procedure QuickSortIndexedPUtf8Char(Values: PPUtf8CharArray; Count: integer;
   var SortedIndexes: TCardinalDynArray; CaseSensitive: boolean = false);
 
@@ -3908,6 +4366,11 @@ var
   // - this unit will just set a wrapper raising an ERttiException
   // - link mormot.core.json.pas to have a working implementation
   // - rather call LoadJson() from mormot.core.json than this low-level function
+  /// 低级 JSON 反序列化函数
+   // - 在此单元中定义以避免与 mormot.core.json 的循环引用，而是发布 TDynArray.LoadFromJson 重载方法
+   // - 该单元只会设置一个引发 ERttiException 的包装器
+   // - 链接 mormot.core.json.pas 以获得有效的实现
+   // - 宁愿从 mormot.core.json 调用 LoadJson() 而不是这个低级函数
   GetDataFromJson: procedure(Data: pointer; var Json: PUtf8Char;
     EndOfObject: PUtf8Char; Rtti: TRttiCustom;
     CustomVariantOptions: PDocVariantOptions; Tolerant: boolean;
@@ -3915,6 +4378,7 @@ var
 
 
 { ************ Abstract Radix Tree Classes }
+{ ************ 抽象基数树类 }
 
 type
   TRadixTree = class;
@@ -3926,42 +4390,59 @@ type
   // - rtfParamPath is for a rtfParam which value should be the whole path,
   // until the end of the URI or the beginning of the parameters (i.e. at '?'),
   // set individually as <path:###> parameter - * being synonymous to <path:path>
+  /// 细化 TRadixTreeNode 内容
+   // - rtfParam 是 <param> 节点，即名称 <> nil 的 TRadixTreeNodeParams
+   // - rtfParamInteger 用于 rtfParam，其值只能是一个整数，可以来自 rtoIntegerParams 全局标志，也可以单独作为 <int:###>
+   // - rtfParamPath 用于 rtfParam，其值应该是整个路径，直到 URI 末尾或参数开头（即在“？”处），单独设置为 <path:###> 参数 - * 是 与<路径:路径>同义
   TRadixTreeNodeFlags = set of (
     rtfParam,
     rtfParamInteger,
     rtfParamPath);
 
   /// implement an abstract Radix Tree node
+  /// 实现一个抽象的Radix Tree节点
   TRadixTreeNode = class
   protected
     function ComputeDepth: integer;
     procedure SortChildren;
   public
     /// the main Tree holding this node
+    /// 持有此节点的主树
     Owner: TRadixTree;
     /// the characters to be compared at this level
+    /// 该级别要比较的字符
     Chars: RawUtf8;
     /// how many branches are within this node - used to sort by priority
+    /// 该节点内有多少个分支 - 用于按优先级排序
     Depth: integer;
     /// describe the content of this node
+    /// 描述该节点的内容
     Flags: TRadixTreeNodeFlags;
     /// the nested nodes
+    /// 嵌套节点
     Child: array of TRadixTreeNode;
     /// the whole text up to this level
+    /// 到此级别的整个文本
     FullText: RawUtf8;
     /// initialize this node instance
+    /// 初始化该节点实例
     constructor Create(aOwner: TRadixTree); reintroduce;
     /// instantiate a new node with the same class and properties
+    /// 实例化一个具有相同类和属性的新节点
     function Split(const Text: RawUtf8): TRadixTreeNode; virtual;
     /// finalize this Radix Tree node
+    /// 完成这个基数树节点
     destructor Destroy; override;
     /// search for the node corresponding to a given text
+    /// 搜索给定文本对应的节点
     function Find(P: PUtf8Char): TRadixTreeNode;
     /// internal debugging/testing method
+    /// 内部调试/测试方法
     procedure ToText(var Result: RawUtf8; Level: integer);
   end;
 
   /// our TRadixTree works on dynamic/custom types of node classes
+  /// 我们的 TRadixTree 适用于动态/自定义类型的节点类
   TRadixTreeNodeClass = class of TRadixTreeNode;
 
   /// allow to customize TRadixTree process
@@ -3969,6 +4450,9 @@ type
   // always case-sensitive, because they are user-specific runtime variables)
   // - if <param> values should be only plain integers, never alphabetical text -
   // you may also specify int:xxx for a single parameter, e.g. as <int:id>
+  /// 允许自定义 TRadixTree 进程
+   // - 例如 静态文本匹配是否应不区分大小写（但 <params> 始终区分大小写，因为它们是特定于用户的运行时变量）
+   // - 如果 <param> 值应该只是普通整数，而不是字母文本 - 您也可以为单个参数指定 int:xxx，例如 作为 <int:id>
   TRadixTreeOptions = set of (
     rtoCaseInsensitiveUri,
     rtoIntegerParams);
@@ -3978,6 +4462,9 @@ type
   // a text value: a TDynArrayHasher/TDictionary is faster and uses less RAM
   // - but, once extended e.g. as TUriTree, it can very efficiently parse
   // some text with variants parts (e.g. parameters)
+  /// 在 UTF-8 不区分大小写的文本上实现抽象基数树
+   // - 因此，如果您只需要查找文本值，则此类不是很有用：TDynArrayHasher/TDictionary 更快并且使用更少的 RAM
+   // - 但是，一旦扩展，例如 作为 TUriTree，它可以非常有效地解析一些带有变体部分的文本（例如参数）
   TRadixTree = class
   protected
     fRoot: TRadixTreeNode;
@@ -3987,59 +4474,86 @@ type
     procedure SetNodeClass; virtual; abstract;
   public
     /// initialize the Radix Tree
+    /// 初始化基数树
     constructor Create(aOptions: TRadixTreeOptions = []); reintroduce;
     /// finalize this Radix Tree
+    /// 完成这个基数树
     destructor Destroy; override;
     /// define how TRadixTreeNode.Lookup() will process this node
     // - as set with this class constructor
+    /// 定义 TRadixTreeNode.Lookup() 将如何处理此节点
+     // - 使用此类构造函数设置
     property Options: TRadixTreeOptions
       read fOptions;
     /// finalize this Radix Tree node
+    /// 完成这个基数树节点
     procedure Clear;
     /// low-level insertion of a given Text entry as a given child
     // - may return an existing node instance, if Text was already inserted
+    /// 将给定文本条目作为给定子条目进行低级插入
+     // - 如果文本已插入，则可能返回现有节点实例
     function Insert(Text: RawUtf8; Node: TRadixTreeNode = nil;
       NodeClass: TRadixTreeNodeClass = nil): TRadixTreeNode;
     /// to be called after Insert() to consolidate the internal tree state
     // - nodes will be sorted by search priority, i.e. the longest depths first
     // - as called e.g. by TUriTree.Setup()
+    /// 在 Insert() 之后调用以巩固内部树状态
+     // - 节点将按搜索优先级排序，即最长深度优先
+     // - 称为例如 通过 TUriTree.Setup()
     procedure AfterInsert;
     /// search for the node corresponding to a given text
     // - more than 6 million lookups per second, with 1000 items stored
+    /// 搜索给定文本对应的节点
+     // - 每秒超过 600 万次查找，存储了 1000 个项目
     function Find(const Text: RawUtf8): TRadixTreeNode;
     /// internal debugging/testing method
+    /// 内部调试/测试方法
     function ToText: RawUtf8;
     /// low-level access to the root node of the Radix Tree
+    /// 低级访问Radix Tree的根节点
     property Root: TRadixTreeNode
       read fRoot;
   end;
 
   /// implement an abstract Radix Tree static or <param> node
+  /// 实现一个抽象基数树静态或 <param> 节点
   TRadixTreeNodeParams = class(TRadixTreeNode)
   protected
     /// is called for each <param> as Pos/Len pair
     // - called eventually with Pos^='?' and Len=-1 for the inlined parameters
     // - should return true on success, false to abort
+    /// 为每个 <param> 作为 Pos/Len 对调用
+     // - 最终使用 Pos^='?' 调用 Len=-1 表示内联参数
+     // - 成功时应返回 true，中止时应返回 false
     function LookupParam(Ctxt: TObject; Pos: PUtf8Char; Len: integer): boolean;
       virtual; abstract;
   public
     /// all the <param1> <param2> names, in order, up to this parameter
     // - equals nil for static nodes
     // - is referenced as pointer into THttpServerRequestAbstract.fRouteName
+    /// 所有 <param1> <param2> 名称，按顺序排列，直到该参数
+     // - 静态节点等于 nil
+     // - 被引用为 THttpServerRequestAbstract.fRouteName 的指针
     Names: TRawUtf8DynArray;
     /// overriden to support the additional Names fields
     function Split(const Text: RawUtf8): TRadixTreeNode; override;
     /// main search method, recognizing static or <param> patterns
+    /// 主要搜索方法，识别静态或<param>模式
     function Lookup(P: PUtf8Char; Ctxt: TObject): TRadixTreeNodeParams;
   end;
 
   /// implement an abstract Radix Tree with static or <param> nodes
+  /// 使用静态或 <param> 节点实现抽象基数树
   TRadixTreeParams = class(TRadixTree)
   public
     /// low-level registration of a new URI path, with <param> support
     // - returns the node matching the given URI
     // - called e.g. from TUriRouter.Rewrite/Run methods
     // - will recognize <param> alphanumerical and <int:id> integer parameters
+    /// 新 URI 路径的低级注册，支持 <param>
+     // - 返回与给定 URI 匹配的节点
+     // - 称为例如 来自 TUriRouter.Rewrite/Run 方法
+     // - 将识别 <param> 字母数字和 <int:id> 整数参数
     function Setup(const aFromUri: RawUtf8; out aNames: TRawUtf8DynArray): TRadixTreeNodeParams;
   end;
 
@@ -4050,12 +4564,14 @@ implementation
 
 
 { ************ RTL TPersistent / TInterfacedObject with Custom Constructor }
+{ ************ RTL TPersistent / TInterfacedObject 与自定义构造函数 }
 
 { TPersistentWithCustomCreate }
 
 constructor TPersistentWithCustomCreate.Create;
 begin
   // nothing to do by default - overridden constructor may add custom code
+  // 默认情况下不执行任何操作 - 重写的构造函数可能会添加自定义代码
 end;
 
 
@@ -4064,6 +4580,7 @@ end;
 constructor TInterfacedObjectWithCustomCreate.Create;
 begin
   // nothing to do by default - overridden constructor may add custom code
+  // 默认情况下不执行任何操作 - 重写的构造函数可能会添加自定义代码
 end;
 
 procedure TInterfacedObjectWithCustomCreate.RefCountUpdate(Release: boolean);
@@ -4149,6 +4666,7 @@ end;
 procedure TAutoFree.ForMethod;
 begin
   // do-nothing method to circumvent the Delphi 10.4 IAutoFree early release
+  // 什么都不做的方法来规避 Delphi 10.4 IAutoFree 早期版本
 end;
 
 class function TAutoFree.One(var localVariable; obj: TObject): IAutoFree;
@@ -4163,6 +4681,7 @@ class function TAutoFree.Several(const varObjPairs: array of pointer): IAutoFree
 begin
   result := Create(varObjPairs);
   // inlining is not possible on Delphi -> Delphi 10.4 caller should run ForMethod :(
+  // 在 Delphi 上内联是不可能的 -> Delphi 10.4 调用者应该运行 ForMethod :(
 end;
 
 procedure TAutoFree.Another(var localVariable; obj: TObject);
@@ -12355,3 +12874,5 @@ initialization
   InitializeUnit;
 
 end.
+
+
